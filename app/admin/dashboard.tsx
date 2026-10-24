@@ -192,15 +192,15 @@ export default function AdminDashboard() {
     const digits = quote.phone
       .replace(/[٠-٩]/g, d => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
       .replace(/[۰-۹]/g, d => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
-      .replace(/\\D/g, "");
+      .replace(/\D/g, "");
     if (digits.length < 8 || digits.length > 15) {
       setNotice("رقم هاتف العميل غير صالح لإعداد رابط واتساب. راجع الرقم قبل التواصل.");
       return;
     }
-    const priceLine = quote.estimatedPrice ? "\\nتفاصيل العرض: " + quote.estimatedPrice : "";
+    const priceLine = quote.estimatedPrice ? "\nتفاصيل العرض: " + quote.estimatedPrice : "";
     const message = "مرحبًا " + quote.customerName + "، بخصوص طلب عرض السعر لمنتج " + quote.productName +
       " (رقم المتابعة: " + quote.id + "). حالة الطلب: " + quote.status + "." + priceLine +
-      "\\nيسعدنا الرد على أي استفسار. — ركن للأعمال الفنية";
+      "\nيسعدنا الرد على أي استفسار. — ركن للأعمال الفنية";
     window.open("https://wa.me/" + digits + "?text=" + encodeURIComponent(message), "_blank", "noopener,noreferrer");
     setNotice("تم فتح واتساب برسالة جاهزة للعميل. راجع الرسالة واضغط إرسال داخل واتساب لإتمام الإشعار.");
   }
