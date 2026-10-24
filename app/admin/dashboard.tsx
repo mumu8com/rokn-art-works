@@ -193,7 +193,7 @@ export default function AdminDashboard() {
       .replace(/[٠-٩]/g, d => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
       .replace(/[۰-۹]/g, d => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
       .trim();
-    let digits = rawPhone.replace(/\\D/g, "");
+    let digits = rawPhone.replace(/\D/g, "");
     if (digits.startsWith("00")) digits = digits.slice(2);
 
     // Preserve an already international number. Only apply Libya's country code
@@ -206,15 +206,15 @@ export default function AdminDashboard() {
       digits = "218" + digits;
     }
 
-    if (digits.length < 10 || digits.length > 15 || !/^\\d+$/.test(digits)) {
+    if (digits.length < 10 || digits.length > 15 || !/^\d+$/.test(digits)) {
       setNotice("رقم الهاتف غير مكتمل أو غير صالح. افتح بيانات الطلب وصحح الرقم بصيغة دولية، مثل 218912345678، ثم أعد المحاولة.");
       return;
     }
 
-    const priceLine = quote.estimatedPrice ? "\\nتفاصيل العرض: " + quote.estimatedPrice : "";
+    const priceLine = quote.estimatedPrice ? "\nتفاصيل العرض: " + quote.estimatedPrice : "";
     const message = "مرحبًا " + quote.customerName + "، بخصوص طلب عرض السعر لمنتج " + quote.productName +
       " (رقم المتابعة: " + quote.id + "). حالة الطلب: " + quote.status + "." + priceLine +
-      "\\nيسعدنا الرد على أي استفسار. — ركن للأعمال الفنية";
+      "\nيسعدنا الرد على أي استفسار. — ركن للأعمال الفنية";
     const url = "https://wa.me/" + digits + "?text=" + encodeURIComponent(message);
 
     // Open directly in the click handler so popup blockers are less likely to interfere.
