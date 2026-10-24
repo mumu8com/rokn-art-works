@@ -15,14 +15,19 @@ function pool() {
   });
   return globalForPool.roknBackgroundPool;
 }
+let schemaReady: Promise<void> | null = null;
 async function ensureTable() {
-  await pool().query(`CREATE TABLE IF NOT EXISTS design_backgrounds (
-    id TEXT PRIMARY KEY, template_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
-    image TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )`);
-  await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS asset_type TEXT NOT NULL DEFAULT 'background'");
-}
-export async function GET(request: Request) {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      await pool().query(`CREATE TABLE IF NOT EXISTS design_backgrounds (
+          id TEXT PRIMARY KEY, template_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
+          image TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS asset_type TEXT NOT NULL DEFAULT 'background'");
+    })().catch((error) => { schemaReady = null; throw error; });
+  }
+  await schemaReady;
+}export async function GET(request: Request) {
   try {
     await ensureTable();
     const params = new URL(request.url).searchParams;
