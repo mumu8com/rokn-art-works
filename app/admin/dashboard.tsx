@@ -44,6 +44,11 @@ export default function AdminDashboard() {
   const [designBackgrounds,setDesignBackgrounds] = useState<DesignBackground[]>([]);
   const [backgroundSaving,setBackgroundSaving] = useState(false);
   const [backgroundLoading,setBackgroundLoading] = useState(false);
+  const [baseTitle,setBaseTitle] = useState("");
+  const [baseImage,setBaseImage] = useState("");
+  const [designBases,setDesignBases] = useState<DesignBackground[]>([]);
+  const [baseSaving,setBaseSaving] = useState(false);
+  const [baseLoading,setBaseLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -118,6 +123,51 @@ export default function AdminDashboard() {
     return ()=>{cancelled=true;};
   }, [backgroundTemplateId]);
 
+  useEffect(() => {
+    if (!backgroundTemplateId) { setDesignBases([]); return; }
+    let cancelled = false;
+    setBaseLoading(true);
+    fetch("/api/design-backgrounds?templateId="+encodeURIComponent(backgroundTemplateId)+"&type=base")
+      .then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error||"تعذر تحميل الأشكال");if(!cancelled)setDesignBases(data.backgrounds||[]);})
+      .catch(err=>{if(!cancelled)setNotice(err instanceof Error?err.message:"تعذر تحميل الأشكال المحفوظة.");})
+      .finally(()=>{if(!cancelled)setBaseLoading(false);});
+    return ()=>{cancelled=true;};
+  }, [backgroundTemplateId]);
+
+  function loadBaseImage(file?: File) {
+    if(!file)return;
+    if(!file.type.startsWith("image/")){setNotice("اختر ملف صورة صالحًا.");return;}
+    if(file.size>5*1024*1024){setNotice("الحد الأقصى لحجم الشكل 5 ميغابايت.");return;}
+    const reader=new FileReader();
+    reader.onload=()=>setBaseImage(String(reader.result||""));
+    reader.readAsDataURL(file);
+  }
+  async function saveDesignBase(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if(!backgroundTemplateId){setNotice("أضف قالبًا أولًا ثم اختره لحفظ الأشكال.");return;}
+    if(!baseImage){setNotice("اختر صورة الشكل أولًا.");return;}
+    setBaseSaving(true);
+    try {
+      const response=await fetch("/api/design-backgrounds",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({templateId:backgroundTemplateId,title:baseTitle.trim()||"الشكل",image:baseImage,type:"base"})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"تعذر حفظ الشكل");
+      setDesignBases(prev=>[data.background,...prev]);
+      setBaseTitle("");
+      setBaseImage("");
+      setNotice("تم حفظ الشكل وربطه بالقالب المحدد فقط.");
+    } catch(err) { setNotice(err instanceof Error?err.message:"تعذر حفظ الشكل."); }
+    finally { setBaseSaving(false); }
+  }
+  async function deleteDesignBase(id:string) {
+    if(!confirm("هل تريد حذف الشكل المحفوظ؟"))return;
+    try {
+      const response=await fetch("/api/design-backgrounds?id="+encodeURIComponent(id),{method:"DELETE"});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"تعذر حذف الشكل");
+      setDesignBases(prev=>prev.filter(bg=>bg.id!==id));
+      setNotice("تم حذف الشكل المحفوظ.");
+    } catch(err) { setNotice(err instanceof Error?err.message:"تعذر حذف الشكل."); }
+  }
   function loadBackgroundImage(file?: File) {
     if(!file)return;
     if(!file.type.startsWith("image/")){setNotice("اختر ملف صورة صالحًا.");return;}
@@ -209,6 +259,24 @@ export default function AdminDashboard() {
               </form>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginTop:18}}>
                 {backgroundLoading?<p>جارٍ تحميل الخلفيات…</p>:designBackgrounds.length===0?<p className="editor-help">لا توجد خلفيات محفوظة لهذا القالب حتى الآن.</p>:designBackgrounds.map(bg=><article key={bg.id} style={{border:"1px solid #e0e6ed",borderRadius:11,padding:9,minWidth:0}}><img src={bg.image} alt={bg.title} style={{width:"100%",height:120,objectFit:"cover",borderRadius:8,background:"#f4f6f9"}}/><b style={{display:"block",fontSize:13,marginTop:8,overflowWrap:"anywhere"}}>{bg.title}</b><button className="btn secondary" type="button" style={{marginTop:8}} onClick={()=>deleteDesignBackground(bg.id)}>حذف الخلفية</button></article>)}
+              </div>
+            </>}
+          </section>
+          <section className="panel product-form" style={{marginTop:20}}>
+            <div className="panel-head"><div><h3>مكتبة الأشكال المحفوظة (القاعدة)</h3><p>ارفع صور القاعدة أو الشكل من الإدارة واربطها بقالب محدد؛ تبقى منفصلة عن صور الخلفية.</p></div></div>
+            {designTemplates.length===0?<p className="editor-help">أضف قالبًا أولًا حتى تتمكن من حفظ الأشكال الخاصة به.</p>:<>
+              <label>القالب الذي ستُحفظ أشكاله
+                <select value={backgroundTemplateId} onChange={e=>{setBackgroundTemplateId(e.target.value);setBaseTitle("");setBaseImage("");}}>{designTemplates.map(t=><option key={t.id} value={t.id}>{t.title} — {t.category}</option>)}</select>
+              </label>
+              <form onSubmit={saveDesignBase}>
+                <label>اسم الشكل<input value={baseTitle} maxLength={120} onChange={e=>setBaseTitle(e.target.value)} placeholder="مثال: قاعدة خشبية مستطيلة"/></label>
+                <label>صورة القاعدة / الشكل (PNG / JPG / WEBP)<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e=>loadBaseImage(e.target.files?.[0])}/></label>
+                {baseImage&&<div style={{marginTop:10}}><img src={baseImage} alt="معاينة الشكل قبل الحفظ" style={{width:"100%",maxWidth:360,maxHeight:200,objectFit:"contain",borderRadius:10,background:"#f4f6f9"}}/><button type="button" className="btn secondary" onClick={()=>setBaseImage("")}>إزالة الصورة المختارة</button></div>}
+                <p className="editor-help">تُحفظ الصور في قاعدة البيانات المشتركة ضمن القالب المحدد فقط. الحد الأقصى 5 ميغابايت.</p>
+                <div className="form-actions"><button className="btn primary" type="submit" disabled={baseSaving}>{baseSaving?"جارٍ الحفظ…":"حفظ الشكل للقالب"}</button></div>
+              </form>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginTop:18}}>
+                {baseLoading?<p>جارٍ تحميل الأشكال…</p>:designBases.length===0?<p className="editor-help">لا توجد أشكال محفوظة لهذا القالب حتى الآن.</p>:designBases.map(bg=><article key={bg.id} style={{border:"1px solid #e0e6ed",borderRadius:11,padding:9,minWidth:0}}><img src={bg.image} alt={bg.title} style={{width:"100%",height:120,objectFit:"contain",borderRadius:8,background:"#f4f6f9"}}/><b style={{display:"block",fontSize:13,marginTop:8,overflowWrap:"anywhere"}}>{bg.title}</b><button className="btn secondary" type="button" style={{marginTop:8}} onClick={()=>deleteDesignBase(bg.id)}>حذف الشكل</button></article>)}
               </div>
             </>}
           </section>
