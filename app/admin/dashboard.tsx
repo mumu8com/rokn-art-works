@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   const [templateForm,setTemplateForm] = useState<DesignTemplate>({id:"",title:"",category:"دروع",description:"",image:"",published:true});
   const [templateFormOpen,setTemplateFormOpen] = useState(false);
   const [templateSaving,setTemplateSaving] = useState(false);
-  type DesignBackground = {id:string;templateId:string;title:string;image:string;createdAt?:string};
+  type DesignBackground = {id:string;templateId:string;title:string;image:string;createdAt?:string;placementX?:number;placementY?:number;placementWidth?:number;placementHeight?:number};
   const [backgroundTemplateId,setBackgroundTemplateId] = useState("");
   const [backgroundTitle,setBackgroundTitle] = useState("");
   const [backgroundImage,setBackgroundImage] = useState("");
@@ -158,6 +158,19 @@ export default function AdminDashboard() {
     } catch(err) { setNotice(err instanceof Error?err.message:"تعذر حفظ الشكل."); }
     finally { setBaseSaving(false); }
   }
+  async function saveAssetPlacement(asset: DesignBackground, type: "background" | "base") {
+    const currentList = type === "base" ? designBases : designBackgrounds;
+    const latest = currentList.find(item => item.id === asset.id) || asset;
+    const placement = { placementX: latest.placementX ?? (type === "base" ? 15 : 0), placementY: latest.placementY ?? (type === "base" ? 20 : 0), placementWidth: latest.placementWidth ?? (type === "base" ? 70 : 100), placementHeight: latest.placementHeight ?? (type === "base" ? 60 : 100) };
+    try {
+      const response = await fetch("/api/design-backgrounds", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: asset.id, ...placement }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "تعذر حفظ موضع الصورة");
+      const update = (items: DesignBackground[]) => items.map(item => item.id === asset.id ? { ...item, ...placement } : item);
+      if (type === "base") setDesignBases(update); else setDesignBackgrounds(update);
+      setNotice("تم حفظ حجم ومكان الصورة؛ سيستخدمهما الاستوديو تلقائيًا عند اختيار العميل لها.");
+    } catch (err) { setNotice(err instanceof Error ? err.message : "تعذر حفظ موضع الصورة."); }
+  }
   async function deleteDesignBase(id:string) {
     if(!confirm("هل تريد حذف الشكل المحفوظ؟"))return;
     try {
@@ -258,7 +271,7 @@ export default function AdminDashboard() {
                 <div className="form-actions"><button className="btn primary" type="submit" disabled={backgroundSaving}>{backgroundSaving?"جارٍ الحفظ…":"حفظ الخلفية للقالب"}</button></div>
               </form>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginTop:18}}>
-                {backgroundLoading?<p>جارٍ تحميل الخلفيات…</p>:designBackgrounds.length===0?<p className="editor-help">لا توجد خلفيات محفوظة لهذا القالب حتى الآن.</p>:designBackgrounds.map(bg=><article key={bg.id} style={{border:"1px solid #e0e6ed",borderRadius:11,padding:9,minWidth:0}}><img src={bg.image} alt={bg.title} style={{width:"100%",height:120,objectFit:"cover",borderRadius:8,background:"#f4f6f9"}}/><b style={{display:"block",fontSize:13,marginTop:8,overflowWrap:"anywhere"}}>{bg.title}</b><button className="btn secondary" type="button" style={{marginTop:8}} onClick={()=>deleteDesignBackground(bg.id)}>حذف الخلفية</button></article>)}
+                {backgroundLoading?<p>جارٍ تحميل الخلفيات…</p>:designBackgrounds.length===0?<p className="editor-help">لا توجد خلفيات محفوظة لهذا القالب حتى الآن.</p>:designBackgrounds.map(bg=><article key={bg.id} style={{border:"1px solid #e0e6ed",borderRadius:11,padding:9,minWidth:0}}><img src={bg.image} alt={bg.title} style={{width:"100%",height:120,objectFit:"contain",borderRadius:8,background:"#f4f6f9"}}/><b style={{display:"block",fontSize:13,marginTop:8,overflowWrap:"anywhere"}}>{bg.title}</b><PlacementFields asset={bg} type="background" onChange={(id,patch)=>setDesignBackgrounds(items=>items.map(item=>item.id===id?{...item,...patch}:item))}/><button className="btn primary" type="button" style={{marginTop:8}} onClick={()=>saveAssetPlacement(bg,"background")}>حفظ الحجم والمكان</button><button className="btn secondary" type="button" style={{marginTop:8}} onClick={()=>deleteDesignBackground(bg.id)}>حذف الخلفية</button></article>)}
               </div>
             </>}
           </section>
@@ -276,7 +289,7 @@ export default function AdminDashboard() {
                 <div className="form-actions"><button className="btn primary" type="submit" disabled={baseSaving}>{baseSaving?"جارٍ الحفظ…":"حفظ الشكل للقالب"}</button></div>
               </form>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginTop:18}}>
-                {baseLoading?<p>جارٍ تحميل الأشكال…</p>:designBases.length===0?<p className="editor-help">لا توجد أشكال محفوظة لهذا القالب حتى الآن.</p>:designBases.map(bg=><article key={bg.id} style={{border:"1px solid #e0e6ed",borderRadius:11,padding:9,minWidth:0}}><img src={bg.image} alt={bg.title} style={{width:"100%",height:120,objectFit:"contain",borderRadius:8,background:"#f4f6f9"}}/><b style={{display:"block",fontSize:13,marginTop:8,overflowWrap:"anywhere"}}>{bg.title}</b><button className="btn secondary" type="button" style={{marginTop:8}} onClick={()=>deleteDesignBase(bg.id)}>حذف الشكل</button></article>)}
+                {baseLoading?<p>جارٍ تحميل الأشكال…</p>:designBases.length===0?<p className="editor-help">لا توجد أشكال محفوظة لهذا القالب حتى الآن.</p>:designBases.map(bg=><article key={bg.id} style={{border:"1px solid #e0e6ed",borderRadius:11,padding:9,minWidth:0}}><img src={bg.image} alt={bg.title} style={{width:"100%",height:120,objectFit:"contain",borderRadius:8,background:"#f4f6f9"}}/><b style={{display:"block",fontSize:13,marginTop:8,overflowWrap:"anywhere"}}>{bg.title}</b><PlacementFields asset={bg} type="base" onChange={(id,patch)=>setDesignBases(items=>items.map(item=>item.id===id?{...item,...patch}:item))}/><button className="btn primary" type="button" style={{marginTop:8}} onClick={()=>saveAssetPlacement(bg,"base")}>حفظ الحجم والمكان</button><button className="btn secondary" type="button" style={{marginTop:8}} onClick={()=>deleteDesignBase(bg.id)}>حذف الشكل</button></article>)}
               </div>
             </>}
           </section>
@@ -288,6 +301,11 @@ export default function AdminDashboard() {
   </main>;
 }
 
+function PlacementFields({asset,type,onChange}:{asset:DesignBackground;type:"background"|"base";onChange:(id:string,patch:Partial<DesignBackground>)=>void}) {
+  const defaults = type === "base" ? {placementX:15,placementY:20,placementWidth:70,placementHeight:60} : {placementX:0,placementY:0,placementWidth:100,placementHeight:100};
+  const fields = [{key:"placementX" as const,label:"الموضع الأفقي %",value:asset.placementX??defaults.placementX},{key:"placementY" as const,label:"الموضع العمودي %",value:asset.placementY??defaults.placementY},{key:"placementWidth" as const,label:"العرض %",value:asset.placementWidth??defaults.placementWidth},{key:"placementHeight" as const,label:"الارتفاع %",value:asset.placementHeight??defaults.placementHeight}];
+  return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginTop:10}}>{fields.map(field=><label key={field.key} style={{fontSize:11,color:"#526273"}}>{field.label}<input type="number" min="0" max="100" value={field.value} onChange={e=>onChange(asset.id,{[field.key]:Number(e.target.value)})} style={{display:"block",width:"100%",marginTop:4,padding:"7px",border:"1px solid #dce3ea",borderRadius:7}}/></label>)}<small style={{gridColumn:"1 / -1",color:"#718096"}}>النسب من مساحة التصميم. اترك هامشًا بحيث لا يتجاوز الموضع + الحجم 100%.</small></div>;
+}
 function Stat({icon:Icon,label,value,hint,tone}:{icon:typeof Package;label:string;value:string;hint:string;tone:string}){return <article className="stat-card"><div className={"stat-icon "+tone}><Icon size={19}/></div><span>{label}</span><strong>{value}</strong><small>{hint}</small></article>}
 function QuickAction({icon:Icon,title,desc,onClick}:{icon:typeof Package;title:string;desc:string;onClick:()=>void}){return <button className="quick-action" onClick={onClick}><span><Icon size={18}/></span><div><b>{title}</b><small>{desc}</small></div><ChevronLeft size={16}/></button>}
 function ProductTable({products,onEdit,onDelete,onTogglePublish}:{products:Product[];onEdit:(id:number)=>void;onDelete?:(id:number)=>void;onTogglePublish?:(id:number)=>void}){return <div className="table-wrap"><table className="products-table"><thead><tr><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>{products.map(p=><tr key={p.id}><td><div className="product-cell"><div className="product-thumb"><Box size={19}/></div><div><b>{p.name}</b><small>{p.description||"بدون وصف"}</small></div></div></td><td>{p.category}</td><td>{p.price}</td><td><span className={"product-status "+(p.status==="منشور"?"published":"draft")}>{p.status}</span></td><td><div className="row-actions"><button onClick={()=>onEdit(p.id)}>تعديل</button>{onTogglePublish&&<button onClick={()=>onTogglePublish(p.id)}>{p.status==="منشور"?"إرجاع لمسودة":"نشر"}</button>}{onDelete&&<button className="delete-action" onClick={()=>onDelete(p.id)}>حذف</button>}</div></td></tr>)}</tbody></table>{products.length===0&&<div className="table-empty">لا توجد منتجات مطابقة لبحثك.</div>}</div>}
