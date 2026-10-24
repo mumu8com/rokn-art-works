@@ -30,24 +30,37 @@ export default function AdminDashboard() {
   const [mobileNav, setMobileNav] = useState(false);
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({name:"",category:"دروع",price:"حسب الطلب",description:""});
-  const [ready, setReady] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   useEffect(() => {
     try { const saved = localStorage.getItem("rokn-admin-products"); if (saved) setProducts(JSON.parse(saved)); } catch {}
-    setReady(true);
   }, []);
 
-  function saveProducts(next: Product[]) {
-    setProducts(next);
-    try { localStorage.setItem("rokn-admin-products", JSON.stringify(next)); } catch {}
-    setNotice("تم تحديث القائمة على هذا المتصفح فقط.");
+  function saveProducts(next: Product[]): boolean {
+    try {
+      localStorage.setItem("rokn-admin-products", JSON.stringify(next));
+      setProducts(next);
+      setNotice("تم الحفظ في هذا المتصفح فقط؛ لم تتم مزامنة المنتجات مع قاعدة بيانات.");
+      return true;
+    } catch {
+      setNotice("تعذر حفظ التغييرات في المتصفح. تحقق من مساحة التخزين وإعدادات الخصوصية ثم أعد المحاولة.");
+      return false;
+    }
   }
   function addProduct(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!form.name.trim()) return;
-    saveProducts([{...form,id:Date.now(),status:"مسودة"},...products]);
-    setForm({name:"",category:"دروع",price:"حسب الطلب",description:""});
-    setShowForm(false);
+    if (!form.name.trim()) { setNotice("يرجى إدخال اسم المنتج."); return; }
+    const next = editingId === null
+      ? [{...form,id:Date.now(),status:"مسودة" as const},...products]
+      : products.map(p => p.id === editingId ? {...p,...form} : p);
+    if (saveProducts(next)) {
+      setForm({name:"",category:"دروع",price:"حسب الطلب",description:""});
+      setEditingId(null);
+      setShowForm(false);
+    }
+  }
+  function toggleProductStatus(id: number) {
+    saveProducts(products.map(p => p.id === id ? {...p,status:p.status === "منشور" ? "مسودة" : "منشور"} : p));
   }
   async function logout() {
     await fetch("/api/admin/logout", {method:"POST"});
@@ -76,8 +89,8 @@ export default function AdminDashboard() {
           <div className="setup-banner"><div className="setup-icon"><Activity size={22}/></div><div><b>خطوة مهمة قبل استقبال الطلبات الفعلية</b><p>القائمة الحالية للمنتجات تحفظ داخل المتصفح. لتشغيل المتجر تجاريًا نحتاج قاعدة بيانات دائمة وربط الطلبات وعروض الأسعار بها.</p></div><span className="status-pill">إعداد مطلوب</span></div>
         </>}
         {active==="products"&&<><div className="section-intro"><div><h2>كتالوج المنتجات</h2><p>نظّم منتجاتك وخدماتك الفنية، وأضف وصفًا واضحًا لكل منتج.</p></div><button className="btn primary" onClick={()=>setShowForm(!showForm)}><Plus size={17}/> إضافة منتج</button></div>
-          {showForm&&<form className="panel product-form" onSubmit={addProduct}><div className="panel-head"><h3>بيانات المنتج الجديد</h3><button type="button" className="icon-button" onClick={()=>setShowForm(false)} aria-label="إغلاق"><X size={17}/></button></div><label>اسم المنتج<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="مثال: درع تكريمي فاخر"/></label><div className="form-row"><label>التصنيف<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{["دروع","ميداليات","لوحات","هدايا","ديكور","طباعة ثلاثية الأبعاد","أعمال خشبية","أخرى"].map(c=><option key={c}>{c}</option>)}</select></label><label>السعر أو آلية التسعير<input value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="حسب الطلب"/></label></div><label>وصف المنتج<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={3} placeholder="الخامات، الاستخدام، خيارات التخصيص..."/></label><div className="form-actions"><button className="btn primary" type="submit">حفظ المنتج</button><button className="btn secondary" type="button" onClick={()=>setShowForm(false)}>إلغاء</button></div></form>}
-          <section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث عن منتج..."/></div><span>{filtered.length} منتجات</span></div><ProductTable products={filtered} onEdit={(id)=>{const p=products.find(x=>x.id===id);if(p){setForm({name:p.name,category:p.category,price:p.price,description:p.description});setProducts(products.filter(x=>x.id!==id));setShowForm(true);setNotice("تم تحميل بيانات المنتج للتعديل؛ احفظه بعد الانتهاء.")}}} onDelete={(id)=>{if(confirm("هل تريد حذف هذا المنتج من هذه القائمة؟"))saveProducts(products.filter(p=>p.id!==id))}}/></section>
+          {showForm&&<form className="panel product-form" onSubmit={addProduct}><div className="panel-head"><h3>{editingId === null ? "بيانات المنتج الجديد" : "تعديل بيانات المنتج"}</h3><button type="button" className="icon-button" onClick={()=>{setShowForm(false);setEditingId(null)}} aria-label="إغلاق"><X size={17}/></button></div><label>اسم المنتج<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="مثال: درع تكريمي فاخر"/></label><div className="form-row"><label>التصنيف<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{["دروع","ميداليات","لوحات","هدايا","ديكور","طباعة ثلاثية الأبعاد","أعمال خشبية","أخرى"].map(c=><option key={c}>{c}</option>)}</select></label><label>السعر أو آلية التسعير<input value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="حسب الطلب"/></label></div><label>وصف المنتج<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={3} placeholder="الخامات، الاستخدام، خيارات التخصيص..."/></label><div className="form-actions"><button className="btn primary" type="submit">حفظ المنتج</button><button className="btn secondary" type="button" onClick={()=>{setShowForm(false);setEditingId(null)}}>إلغاء</button></div></form>}
+          <section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث عن منتج..."/></div><span>{filtered.length} منتجات</span></div><ProductTable products={filtered} onEdit={(id)=>{const p=products.find(x=>x.id===id);if(p){setEditingId(id);setForm({name:p.name,category:p.category,price:p.price,description:p.description});setShowForm(true);setNotice("يمكنك تعديل البيانات ثم حفظها؛ لن يُحذف المنتج إذا ألغيت التعديل.")}}} onTogglePublish={toggleProductStatus} onDelete={(id)=>{if(confirm("هل تريد حذف هذا المنتج من هذه القائمة؟"))saveProducts(products.filter(p=>p.id!==id))}}/></section>
         </>}
         {active!=="overview"&&active!=="products"&&<section className="panel empty-module"><div className="empty-icon"><LayoutGrid size={25}/></div><h2>{current}</h2><p>{active==="designs"?"ستكون هنا إدارة قوالب الدروع والميداليات واللوحات وعناصر محرر العميل.":active==="orders"?"ستظهر الطلبات وحالات التنفيذ ومواعيد التسليم بعد ربط قاعدة بيانات الطلبات.":active==="customers"?"سيُعرض ملف كل عميل وسجل طلباته عند تفعيل تخزين بيانات العملاء.":active==="quotes"?"تجهيز عروض الأسعار وربطها بأرقام الطلبات والفواتير.":active==="messages"?"تنظيم استفسارات العملاء ومتابعة الردود.":"إعدادات المتجر وبيانات التواصل والهوية البصرية."}</p><span className="status-pill">قسم جاهز للتطوير</span><div className="empty-module-actions"><button className="btn primary" onClick={()=>setActive("products")}>العودة إلى المنتجات</button><a className="btn secondary" href="mailto:info@rokn-art-works.com">التواصل مع فريق التطوير</a></div></section>}
         <footer className="admin-footer">© {new Date().getFullYear()} ركن للأعمال الفنية <span>لوحة الإدارة · نسخة أولية</span></footer>
@@ -88,4 +101,4 @@ export default function AdminDashboard() {
 
 function Stat({icon:Icon,label,value,hint,tone}:{icon:typeof Package;label:string;value:string;hint:string;tone:string}){return <article className="stat-card"><div className={"stat-icon "+tone}><Icon size={19}/></div><span>{label}</span><strong>{value}</strong><small>{hint}</small></article>}
 function QuickAction({icon:Icon,title,desc,onClick}:{icon:typeof Package;title:string;desc:string;onClick:()=>void}){return <button className="quick-action" onClick={onClick}><span><Icon size={18}/></span><div><b>{title}</b><small>{desc}</small></div><ChevronLeft size={16}/></button>}
-function ProductTable({products,onEdit,onDelete}:{products:Product[];onEdit:(id:number)=>void;onDelete?:(id:number)=>void}){return <div className="table-wrap"><table className="products-table"><thead><tr><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>{products.map(p=><tr key={p.id}><td><div className="product-cell"><div className="product-thumb"><Box size={19}/></div><div><b>{p.name}</b><small>{p.description||"بدون وصف"}</small></div></div></td><td>{p.category}</td><td>{p.price}</td><td><span className={"product-status "+(p.status==="منشور"?"published":"draft")}>{p.status}</span></td><td><div className="row-actions"><button onClick={()=>onEdit(p.id)}>تعديل</button>{onDelete&&<button className="delete-action" onClick={()=>onDelete(p.id)}>حذف</button>}</div></td></tr>)}</tbody></table>{products.length===0&&<div className="table-empty">لا توجد منتجات مطابقة لبحثك.</div>}</div>}
+function ProductTable({products,onEdit,onDelete,onTogglePublish}:{products:Product[];onEdit:(id:number)=>void;onDelete?:(id:number)=>void;onTogglePublish?:(id:number)=>void}){return <div className="table-wrap"><table className="products-table"><thead><tr><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>{products.map(p=><tr key={p.id}><td><div className="product-cell"><div className="product-thumb"><Box size={19}/></div><div><b>{p.name}</b><small>{p.description||"بدون وصف"}</small></div></div></td><td>{p.category}</td><td>{p.price}</td><td><span className={"product-status "+(p.status==="منشور"?"published":"draft")}>{p.status}</span></td><td><div className="row-actions"><button onClick={()=>onEdit(p.id)}>تعديل</button>{onTogglePublish&&<button onClick={()=>onTogglePublish(p.id)}>{p.status==="منشور"?"إرجاع لمسودة":"نشر"}</button>}{onDelete&&<button className="delete-action" onClick={()=>onDelete(p.id)}>حذف</button>}</div></td></tr>)}</tbody></table>{products.length===0&&<div className="table-empty">لا توجد منتجات مطابقة لبحثك.</div>}</div>}
