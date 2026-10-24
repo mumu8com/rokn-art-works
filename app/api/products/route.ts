@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const items = Array.isArray(body.products) ? body.products : [body];
     if (items.length > 250) return NextResponse.json({ error: "عدد المنتجات المرسل كبير جدًا." }, { status: 413 });
     const db = storePool();
-    const saved = [];
+    const saved: Array<{id:number;name:string;category:string;price:string;status:string;description:string;updatedAt?:string}> = [];
     for (const item of items) {
       if (!item || typeof item !== "object") continue;
       const p = item as Record<string, unknown>;
