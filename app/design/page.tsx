@@ -81,7 +81,8 @@ export default function DesignPage() {
     const phone=normalizeDigits(customer.phone).replace(/\D/g,"");
     if(!customer.name.trim()||!phone){setNotice("أدخل اسمك ورقم هاتفك أولًا.");return;}
     let target="";
-    try {target=localStorage.getItem("rokn-whatsapp-number")||"";}catch{}
+    target=process.env.NEXT_PUBLIC_WHATSAPP_NUMBER||"";
+    if(!target){try {target=localStorage.getItem("rokn-whatsapp-number")||"";}catch{}}
     target=normalizeDigits(target).replace(/\D/g,"");
     if(target.startsWith("00")) target=target.slice(2);
     if(target.startsWith("0")) target="218"+target.slice(1);
