@@ -1,7 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpLeft, Award, Box, Check, ChevronLeft, DraftingCompass, Gift, Layers3, Palette, PenTool, ShieldCheck, Sparkles, Wrench } from "lucide-react";
 
-const products = [
+type Product = { id?: string; name: string; category: string; kind?: string; tone?: string; description: string; image?: string };
+
+const products: Product[] = [
   {name:"درع تكريمي فاخر",category:"الدروع",kind:"shield",tone:"",description:"تصميم أنيق لتكريم الإنجازات والشخصيات والمؤسسات."},
   {name:"ميدالية تذكارية",category:"الهدايا التذكارية",kind:"medal",tone:"navy",description:"تفاصيل خاصة بمناسبتك، من الاسم إلى الألوان والعبارة."},
   {name:"لوحة مؤسسية",category:"اللوحات",kind:"board",tone:"wood",description:"لوحات تعريفية وتذكارية مصممة بهوية الجهة."},
@@ -14,13 +19,31 @@ const services = [
 ];
 
 export default function Home() {
+  const [visibleProducts, setVisibleProducts] = useState<Product[]>(products);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/design-templates").then(async (response) => {
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!live || !Array.isArray(data.templates) || data.templates.length === 0) return;
+      setVisibleProducts(data.templates.map((item: { id: string; title?: string; name?: string; category?: string; description?: string; image?: string }) => ({
+        id: item.id, name: item.title || item.name || "منتج مخصص", category: item.category || "منتجات مخصصة",
+        description: item.description || "تصميم حسب الطلب من ركن للأعمال الفنية.", image: item.image || "",
+      })));
+    }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+
   return <main className="wrap">
     <header className="nav"><Link className="brand" href="/"><span className="brand-mark">ر</span> ركن للأعمال الفنية</Link><nav className="links"><a href="#products">المنتجات</a><a href="#services">خدماتنا</a><a href="#process">كيف نعمل؟</a><Link href="/design">استوديو التصميم</Link><Link href="/request">طلب / عرض سعر</Link><Link href="/admin/login">دخول المدير</Link></nav></header>
     <section className="hero"><div><div className="eyebrow"><Sparkles size={14} style={{display:"inline",verticalAlign:"middle",marginLeft:5}}/> من الفكرة إلى قطعة تستحق الاحتفاظ بها</div><h1>أفكارك تستحق أن تتحول إلى <span style={{color:"#a47e43"}}>عمل فني</span></h1><p>نصمم وننفّذ الدروع والهدايا التذكارية واللوحات والأعمال الفنية والهندسية حسب طلبك. اختر نموذجًا، شاركنا تفاصيلك، ودعنا نساعدك في تحويل فكرتك إلى واقع.</p><div className="hero-actions"><Link className="btn primary" href="/design">ابدأ تصميم منتجك <ArrowLeft size={17}/></Link><a className="btn secondary" href="#products">استكشف المنتجات <ChevronLeft size={17}/></a><Link className="btn secondary" href="/request">اطلب منتجًا أو عرض سعر <ArrowUpLeft size={17}/></Link></div><div style={{display:"flex",gap:18,flexWrap:"wrap",marginTop:24,color:"#68798a",fontSize:12}}><span><Check size={14} style={{display:"inline",verticalAlign:"middle",color:"#4b8c69",marginLeft:5}}/> تصميم حسب الطلب</span><span><Check size={14} style={{display:"inline",verticalAlign:"middle",color:"#4b8c69",marginLeft:5}}/> خيارات متعددة للخامات</span><span><Check size={14} style={{display:"inline",verticalAlign:"middle",color:"#4b8c69",marginLeft:5}}/> متابعة مباشرة للتفاصيل</span></div></div>
       <div className="hero-visual"><div className="visual-orb"/><div className="hero-plaque"><div className="plaque-inner"><span>ROKN · CUSTOM MADE</span><strong>شكرًا<br/>وتقديرًا</strong><i/><span>صناعة تليق بإنجازك</span></div></div><div className="visual-caption"><span/> تصاميم تنطلق من فكرتك</div></div>
     </section>
     <section id="products" className="section"><div className="section-heading"><div><div className="eyebrow">منتجات مختارة</div><h2>ابدأ من نموذج، واصنعه بطريقتك</h2><p>اختر الفئة التي تناسب مناسبتك، ثم انتقل إلى مساحة التصميم لتجربة فكرتك.</p></div><Link className="card-link" href="/design">فتح استوديو التصميم <ArrowLeft size={15}/></Link></div>
-      <div className="product-grid">{products.map((p)=><article className="showcase-card" key={p.name}><div className={"product-art "+p.tone}>{p.kind==="shield"?<div className="mini-plaque"><span>شكر<br/>وتقدير</span></div>:p.kind==="medal"?<div className="mini-medal"><span>ركن<br/>للتميز</span></div>:<div className="mini-board"><div><strong>لوحة تذكارية</strong><br/><small>تصميم مخصص للمؤسسات</small></div></div>}</div><div className="card-body"><div className="card-meta"><span className="category-chip">{p.category}</span><span>يصنع حسب الطلب</span></div><h3>{p.name}</h3><p>{p.description}</p><div className="card-bottom"><span className="price-note">السعر حسب المواصفات</span><Link href="/design" className="card-link">خصّص المنتج <ArrowLeft size={14}/></Link></div></div></article>)}</div>
+      <div className="product-grid">{visibleProducts.map((p)=><article className="showcase-card" key={p.id||p.name}>
+        {p.image ? <div className="product-art product-art-image"><img className="product-main-image" src={p.image} alt={p.name}/></div> : <div className={"product-art "+(p.tone||"")}>{p.kind==="shield"?<div className="mini-plaque"><span>شكر<br/>وتقدير</span></div>:p.kind==="medal"?<div className="mini-medal"><span>ركن<br/>للتميز</span></div>:<div className="mini-board"><div><strong>لوحة تذكارية</strong><br/><small>تصميم مخصص للمؤسسات</small></div></div>}</div>}
+        <div className="card-body"><div className="card-meta"><span className="category-chip">{p.category}</span><span>يصنع حسب الطلب</span></div><h3>{p.name}</h3><p>{p.description}</p><div className="card-bottom"><span className="price-note">السعر حسب المواصفات</span><Link href="/design" className="card-link">خصّص المنتج <ArrowLeft size={14}/></Link></div></div>
+      </article>)}</div>
     </section>
     <section id="services" className="section"><div className="section-heading"><div><div className="eyebrow">ماذا نصنع؟</div><h2>خدمات فنية تتسع لأفكارك</h2><p>من القطع التكريمية إلى المشاريع الفنية والهندسية المخصصة.</p></div></div><div className="services-grid">{services.map(s=>{const Icon=s.icon;return <article className="service-card" key={s.title}><div className="service-icon"><Icon size={21}/></div><h3>{s.title}</h3><p>{s.desc}</p></article>})}</div></section>
     <section id="process" className="section"><div className="section-heading"><div><div className="eyebrow">خطوات بسيطة</div><h2>من فكرتك إلى طلب واضح</h2></div></div><div className="services-grid">{[{n:"01",title:"اختر المنتج",desc:"ابدأ من نوع المنتج أو النموذج الأقرب لفكرتك."},{n:"02",title:"خصّص التصميم",desc:"عدّل النصوص والألوان والمقاس، وراجع المعاينة."},{n:"03",title:"أرسل التفاصيل",desc:"جهّز وصفك والملاحظات المطلوبة للحصول على عرض سعر."},{n:"04",title:"اعتماد وتنفيذ",desc:"تُراجع المواصفات والخامات والسعر قبل بدء التصنيع."}].map(s=><article className="service-card" key={s.n}><div className="eyebrow">{s.n}</div><h3 style={{marginTop:12}}>{s.title}</h3><p>{s.desc}</p></article>)}</div></section>
