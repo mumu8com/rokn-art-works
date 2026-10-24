@@ -28,7 +28,8 @@ async function ensureTable() {
     })().catch((error) => { schemaReady = null; throw error; });
   }
   await schemaReady;
-}function unavailable() {
+}
+function unavailable() {
   return NextResponse.json({ error: "تخزين القوالب غير مربوط بعد. يلزم ربط DATABASE_URL بقاعدة PostgreSQL في Render." }, { status: 503 });
 }
 export async function GET() {
