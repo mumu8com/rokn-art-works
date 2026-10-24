@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Activity, ArrowDownLeft, ArrowUpLeft, Bell, Box, CheckCircle2, ChevronLeft, CircleHelp, CreditCard, FileImage, FolderKanban, Gauge, LayoutGrid, LogOut, Menu, MessageSquare, Package, Plus, Search, Settings, ShoppingBag, Sparkles, Users, X } from "lucide-react";
 
 type Product = { id: number; name: string; category: string; price: string; status: "منشور" | "مسودة"; description: string };
+type DesignBackground = {id:string;templateId:string;title:string;image:string;createdAt?:string;placementX?:number;placementY?:number;placementWidth?:number;placementHeight?:number};
 const initialProducts: Product[] = [
   {id:1,name:"درع تكريمي كلاسيكي",category:"دروع",price:"حسب الطلب",status:"منشور",description:"درع أكريليك وخشب مع نقش مخصص"},
   {id:2,name:"ميدالية مناسبات",category:"ميداليات",price:"حسب الطلب",status:"منشور",description:"ميدالية بتصميم وألوان حسب اختيار العميل"},
@@ -37,7 +38,6 @@ export default function AdminDashboard() {
   const [templateForm,setTemplateForm] = useState<DesignTemplate>({id:"",title:"",category:"دروع",description:"",image:"",published:true});
   const [templateFormOpen,setTemplateFormOpen] = useState(false);
   const [templateSaving,setTemplateSaving] = useState(false);
-  type DesignBackground = {id:string;templateId:string;title:string;image:string;createdAt?:string;placementX?:number;placementY?:number;placementWidth?:number;placementHeight?:number};
   const [backgroundTemplateId,setBackgroundTemplateId] = useState("");
   const [backgroundTitle,setBackgroundTitle] = useState("");
   const [backgroundImage,setBackgroundImage] = useState("");
