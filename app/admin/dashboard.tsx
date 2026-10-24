@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Activity, ArrowDownLeft, ArrowUpLeft, Bell, Box, CheckCircle2, ChevronLeft, CircleHelp, CreditCard, FileImage, FolderKanban, Gauge, LayoutGrid, LogOut, Menu, MessageSquare, Package, Plus, Search, Settings, ShoppingBag, Sparkles, Users, X } from "lucide-react";
 
 type Product = { id: number; name: string; category: string; price: string; status: "منشور" | "مسودة"; description: string };
+type StoreOrder = {id:string;customerName:string;phone:string;email:string;productId:number|null;productName:string;quantity:number;details:string;status:string;createdAt:string};
+type StoreQuote = StoreOrder & {estimatedPrice:string};
 type DesignBackground = {id:string;templateId:string;title:string;image:string;createdAt?:string;placementX?:number;placementY?:number;placementWidth?:number;placementHeight?:number};
 const initialProducts: Product[] = [
   {id:1,name:"درع تكريمي كلاسيكي",category:"دروع",price:"حسب الطلب",status:"منشور",description:"درع أكريليك وخشب مع نقش مخصص"},
@@ -28,6 +30,8 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [active, setActive] = useState("overview");
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [orders,setOrders] = useState<StoreOrder[]>([]);
+  const [quotes,setQuotes] = useState<StoreQuote[]>([]);
   const [categories, setCategories] = useState<string[]>(defaultCategories);
   const [newCategory, setNewCategory] = useState("");
   const [search, setSearch] = useState("");
@@ -56,9 +60,28 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("rokn-admin-products"); if (saved) setProducts(JSON.parse(saved));
       const savedCategories = localStorage.getItem("rokn-admin-categories"); if (savedCategories) { const parsed = JSON.parse(savedCategories); if (Array.isArray(parsed) && parsed.every(x => typeof x === "string")) setCategories(Array.from(new Set([...defaultCategories, ...parsed]))); }
       setWhatsappNumber(localStorage.getItem("rokn-whatsapp-number") || "");
+      const savedProducts = localStorage.getItem("rokn-admin-products");
+      fetch("/api/products").then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "تعذر تحميل المنتجات");
+        if (Array.isArray(data.products) && data.products.length) {
+          setProducts(data.products);
+          try { localStorage.setItem("rokn-admin-products",JSON.stringify(data.products)); } catch {}
+        } else {
+          const legacy = savedProducts ? JSON.parse(savedProducts) : initialProducts;
+          const migration = Array.isArray(legacy) && legacy.length ? legacy : initialProducts;
+          const migrated = await fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({products:migration})});
+          const migratedData = await migrated.json();
+          if (!migrated.ok) throw new Error(migratedData.error || "تعذر نقل المنتجات القديمة");
+          setProducts(migratedData.products || []);
+          try { localStorage.setItem("rokn-admin-products",JSON.stringify(migratedData.products || [])); } catch {}
+          setNotice("تم نقل قائمة المنتجات إلى قاعدة البيانات المشتركة.");
+        }
+      }).catch(error=>setNotice(error instanceof Error?error.message:"تعذر تحميل المنتجات من قاعدة البيانات."));
+      fetch("/api/orders").then(async r=>{const d=await r.json();if(r.ok)setOrders(d.orders||[]);}).catch(()=>{});
+      fetch("/api/quotes").then(async r=>{const d=await r.json();if(r.ok)setQuotes(d.quotes||[]);}).catch(()=>{});
     } catch {}
     fetch("/api/design-templates").then(async r=>{const data=await r.json();if(r.ok){const templates=data.templates||[];setDesignTemplates(templates);if(templates.length)setBackgroundTemplateId(templates[0].id);}}).catch(()=>{});
   }, []);
@@ -79,31 +102,59 @@ export default function AdminDashboard() {
     if (products.some(p => p.category === value) || designTemplates.some(t => t.category === value)) { setNotice("لا يمكن حذف صنف مرتبط بمنتج أو قالب. غيّر تصنيف العناصر المرتبطة أولًا."); return; }
     saveCategories(categories.filter(c => c !== value));
   }
-  function saveProducts(next: Product[]): boolean {
+  async function saveProducts(next: Product[]): Promise<boolean> {
     try {
-      localStorage.setItem("rokn-admin-products", JSON.stringify(next));
-      setProducts(next);
-      setNotice("تم الحفظ في هذا المتصفح فقط؛ لم تتم مزامنة المنتجات مع قاعدة بيانات.");
+      const response = await fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({products:next})});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "تعذر حفظ المنتجات");
+      const saved = data.products as Product[];
+      setProducts(current => {
+        const returnedIds = new Set(saved.map(p=>p.id));
+        return [...saved,...current.filter(p=>!returnedIds.has(p.id)&&next.some(n=>n.id===p.id))];
+      });
+      try { localStorage.setItem("rokn-admin-products",JSON.stringify(next)); } catch {}
+      setNotice("تم حفظ المنتجات في قاعدة البيانات المشتركة.");
       return true;
-    } catch {
-      setNotice("تعذر حفظ التغييرات في المتصفح. تحقق من مساحة التخزين وإعدادات الخصوصية ثم أعد المحاولة.");
+    } catch (error) {
+      setNotice(error instanceof Error?error.message:"تعذر حفظ المنتجات في قاعدة البيانات.");
       return false;
     }
   }
-  function addProduct(e: React.FormEvent<HTMLFormElement>) {
+  async function addProduct(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!form.name.trim()) { setNotice("يرجى إدخال اسم المنتج."); return; }
     const next = editingId === null
       ? [{...form,id:Date.now(),status:"مسودة" as const},...products]
       : products.map(p => p.id === editingId ? {...p,...form} : p);
-    if (saveProducts(next)) {
+    if (await saveProducts(next)) {
       setForm({name:"",category:"دروع",price:"حسب الطلب",description:""});
       setEditingId(null);
       setShowForm(false);
     }
   }
-  function toggleProductStatus(id: number) {
-    saveProducts(products.map(p => p.id === id ? {...p,status:p.status === "منشور" ? "مسودة" : "منشور"} : p));
+  async function toggleProductStatus(id: number) {
+    await saveProducts(products.map(p => p.id === id ? {...p,status:p.status === "منشور" ? "مسودة" : "منشور"} : p));
+  }
+  async function deleteProduct(id:number) {
+    try {
+      const response=await fetch("/api/products?id="+encodeURIComponent(id),{method:"DELETE"});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"تعذر حذف المنتج");
+      setProducts(current=>current.filter(p=>p.id!==id));
+      setNotice("تم حذف المنتج من قاعدة البيانات.");
+    } catch(error) { setNotice(error instanceof Error?error.message:"تعذر حذف المنتج."); }
+  }
+  async function updateOrderStatus(order:StoreOrder,status:string) {
+    const response=await fetch("/api/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,status})});
+    const data=await response.json(); if(!response.ok){setNotice(data.error||"تعذر تحديث الطلب");return;}
+    setOrders(items=>items.map(item=>item.id===order.id?{...item,status}:item));setNotice("تم تحديث حالة الطلب.");
+  }
+  async function updateQuoteStatus(quote:StoreQuote,status:string) {
+    const estimatedPrice=window.prompt("أدخل السعر أو تفاصيل العرض (اختياري):",quote.estimatedPrice||"");
+    if(estimatedPrice===null)return;
+    const response=await fetch("/api/quotes",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:quote.id,status,estimatedPrice})});
+    const data=await response.json(); if(!response.ok){setNotice(data.error||"تعذر تحديث عرض السعر");return;}
+    setQuotes(items=>items.map(item=>item.id===quote.id?{...item,status,estimatedPrice}:item));setNotice("تم تحديث عرض السعر.");
   }
   async function logout() {
     await fetch("/api/admin/logout", {method:"POST"});
@@ -265,8 +316,10 @@ export default function AdminDashboard() {
         {active==="categories"&&<><div className="section-intro"><div><h2>إدارة الأصناف</h2><p>الأصناف تنظّم المنتجات، وتُستخدم لتقسيم القوالب إلى لوحات منفصلة داخل استوديو التصميم.</p></div></div><form className="panel product-form" onSubmit={addCategory}><div className="panel-head"><h3>إضافة صنف جديد</h3></div><div className="form-row"><label>اسم الصنف<input required maxLength={80} value={newCategory} onChange={e=>setNewCategory(e.target.value)} placeholder="مثال: هدايا الشركات"/></label><div className="form-actions" style={{alignItems:"end"}}><button className="btn primary" type="submit"><Plus size={16}/> إضافة الصنف</button></div></div></form><section className="panel" style={{marginTop:16}}><div className="panel-head"><div><h3>الأصناف الحالية</h3><p>تظهر الأصناف التي لديها قوالب منشورة كأقسام في الاستوديو.</p></div><span className="status-pill">{categories.length} أصناف</span></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>{categories.map(category=><article key={category} style={{border:"1px solid #e0e6ed",borderRadius:12,padding:14,display:"flex",alignItems:"center",gap:10}}><FolderKanban size={20}/><div style={{flex:1}}><b>{category}</b><small style={{display:"block",color:"#718096",marginTop:4}}>{designTemplates.filter(t=>t.category===category).length} قوالب · {products.filter(p=>p.category===category).length} منتجات</small></div>{!defaultCategories.includes(category)&&<button className="delete-action" onClick={()=>removeCategory(category)}>حذف</button>}</article>)}</div><p className="editor-help" style={{marginTop:14}}>ملاحظة: إدارة الأصناف محفوظة حاليًا في المتصفح نفسه، أما القوالب المنشورة فتُحفظ في قاعدة البيانات المشتركة. أضف قالبًا للصنف ليظهر كقسم للعملاء.</p></section></>}
         {active==="products"&&<><div className="section-intro"><div><h2>كتالوج المنتجات</h2><p>نظّم منتجاتك وخدماتك الفنية، وأضف وصفًا واضحًا لكل منتج.</p></div><button className="btn primary" onClick={()=>setShowForm(!showForm)}><Plus size={17}/> إضافة منتج</button></div>
           {showForm&&<form className="panel product-form" onSubmit={addProduct}><div className="panel-head"><h3>{editingId === null ? "بيانات المنتج الجديد" : "تعديل بيانات المنتج"}</h3><button type="button" className="icon-button" onClick={()=>{setShowForm(false);setEditingId(null)}} aria-label="إغلاق"><X size={17}/></button></div><label>اسم المنتج<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="مثال: درع تكريمي فاخر"/></label><div className="form-row"><label>التصنيف<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{Array.from(new Set([...categories, form.category])).map(c=><option key={c}>{c}</option>)}</select></label><label>السعر أو آلية التسعير<input value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="حسب الطلب"/></label></div><label>وصف المنتج<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={3} placeholder="الخامات، الاستخدام، خيارات التخصيص..."/></label><div className="form-actions"><button className="btn primary" type="submit">حفظ المنتج</button><button className="btn secondary" type="button" onClick={()=>{setShowForm(false);setEditingId(null)}}>إلغاء</button></div></form>}
-          <section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث عن منتج..."/></div><span>{filtered.length} منتجات</span></div><ProductTable products={filtered} onEdit={(id)=>{const p=products.find(x=>x.id===id);if(p){setEditingId(id);setForm({name:p.name,category:p.category,price:p.price,description:p.description});setShowForm(true);setNotice("يمكنك تعديل البيانات ثم حفظها؛ لن يُحذف المنتج إذا ألغيت التعديل.")}}} onTogglePublish={toggleProductStatus} onDelete={(id)=>{if(confirm("هل تريد حذف هذا المنتج من هذه القائمة؟"))saveProducts(products.filter(p=>p.id!==id))}}/></section>
+          <section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث عن منتج..."/></div><span>{filtered.length} منتجات</span></div><ProductTable products={filtered} onEdit={(id)=>{const p=products.find(x=>x.id===id);if(p){setEditingId(id);setForm({name:p.name,category:p.category,price:p.price,description:p.description});setShowForm(true);setNotice("يمكنك تعديل البيانات ثم حفظها؛ لن يُحذف المنتج إذا ألغيت التعديل.")}}} onTogglePublish={toggleProductStatus} onDelete={(id)=>{if(confirm("هل تريد حذف هذا المنتج نهائيًا من قاعدة البيانات؟"))deleteProduct(id)}}/></section>
         </>}
+        {active==="orders"&&<section className="panel"><div className="panel-head"><div><h3>طلبات العملاء</h3><p>الطلبات محفوظة في قاعدة البيانات ويمكن متابعة حالتها.</p></div><span className="status-pill">{orders.length} طلب</span></div><div className="table-wrap"><table className="products-table"><thead><tr><th>العميل</th><th>المنتج</th><th>الكمية</th><th>التواصل والتفاصيل</th><th>الحالة</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><b>{o.customerName}</b><small style={{display:"block"}}>{o.phone}</small></td><td>{o.productName}</td><td>{o.quantity}</td><td>{o.details||"—"}{o.email&&<small style={{display:"block"}}>{o.email}</small>}</td><td><select value={o.status} onChange={e=>updateOrderStatus(o,e.target.value)}>{["جديد","قيد المراجعة","قيد التنفيذ","مكتمل","ملغي"].map(v=><option key={v}>{v}</option>)}</select></td></tr>)}</tbody></table>{orders.length===0&&<div className="table-empty">لا توجد طلبات جديدة حتى الآن.</div>}</div></section>}
+        {active==="quotes"&&<section className="panel"><div className="panel-head"><div><h3>طلبات عروض الأسعار</h3><p>راجع مواصفات العميل وحدّث حالة عرض السعر.</p></div><span className="status-pill">{quotes.length} عرض</span></div><div className="table-wrap"><table className="products-table"><thead><tr><th>العميل</th><th>المنتج</th><th>الكمية</th><th>التفاصيل</th><th>السعر / الحالة</th></tr></thead><tbody>{quotes.map(q=><tr key={q.id}><td><b>{q.customerName}</b><small style={{display:"block"}}>{q.phone}</small></td><td>{q.productName}</td><td>{q.quantity}</td><td>{q.details||"—"}</td><td><div>{q.estimatedPrice||"لم يُحدد بعد"}</div><select value={q.status} onChange={e=>updateQuoteStatus(q,e.target.value)} style={{marginTop:6}}>{["بانتظار التسعير","تم إرسال العرض","مقبول","مرفوض","ملغي"].map(v=><option key={v}>{v}</option>)}</select></td></tr>)}</tbody></table>{quotes.length===0&&<div className="table-empty">لا توجد طلبات عروض أسعار حتى الآن.</div>}</div></section>}
         {active==="settings"&&<section className="panel product-form"><div className="panel-head"><h3>إعدادات استقبال الطلبات</h3></div><p>أدخل رقم واتساب الذي تريد استقبال طلبات التصميم والحجز عليه، مع مفتاح الدولة، دون علامة + أو مسافات. مثال: 2189XXXXXXXX.</p><label>رقم واتساب الاستقبال<input dir="ltr" inputMode="tel" value={whatsappNumber} onChange={e=>setWhatsappNumber(e.target.value)} placeholder="2189XXXXXXXX"/></label><div className="form-actions"><button className="btn primary" onClick={()=>{let normalized=whatsappNumber.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/\D/g,"");if(normalized.startsWith("00"))normalized=normalized.slice(2);if(normalized.startsWith("0"))normalized="218"+normalized.slice(1);if(normalized.length<10){setNotice("أدخل رقم واتساب صحيحًا مع مفتاح الدولة، مثل 2189XXXXXXXX.");return;}try{localStorage.setItem("rokn-whatsapp-number",normalized);setWhatsappNumber(normalized);setNotice("تم حفظ الرقم بصيغة دولية في هذا المتصفح فقط. يجب استخدام المتصفح نفسه في لوحة الإدارة واستوديو التصميم.");}catch{setNotice("تعذر حفظ الرقم في هذا المتصفح.");}}}>حفظ رقم واتساب</button></div><p className="editor-help">مهم: هذه الإعدادات محفوظة في المتصفح الحالي فقط وليست مشتركة بين أجهزة الإدارة والعملاء بعد.</p></section>}{active==="designs"&&<><div className="section-intro"><div><h2>مكتبة قوالب الاستوديو</h2><p>أضف صور القوالب من جهازك، واكتب اسمها وتصنيفها، ثم انشرها لتظهر مباشرة للعملاء في استوديو التصميم.</p></div><button className="btn primary" onClick={()=>{setTemplateForm({id:"",title:"",category:"دروع",description:"",image:"",published:true,contentMode:"both",textX:50,textY:58,imageX:50,imageY:50});setTemplateFormOpen(v=>!v)}}><Plus size={17}/> إضافة قالب</button></div>
           {templateFormOpen&&<form className="panel product-form" onSubmit={saveDesignTemplate}><div className="panel-head"><h3>{templateForm.id?"تعديل القالب":"إنشاء قالب جديد"}</h3><button type="button" className="icon-button" onClick={()=>setTemplateFormOpen(false)} aria-label="إغلاق"><X size={17}/></button></div>
             <label>اسم القالب<input required maxLength={120} value={templateForm.title} onChange={e=>setTemplateForm({...templateForm,title:e.target.value})} placeholder="مثال: درع تكريمي فاخر"/></label>
@@ -319,7 +372,7 @@ export default function AdminDashboard() {
             </>}
           </section>
         </>}
-        {active!=="overview"&&active!=="categories"&&active!=="products"&&active!=="settings"&&active!=="designs"&&<section className="panel empty-module"><div className="empty-icon"><LayoutGrid size={25}/></div><h2>{current}</h2><p>{active==="orders"?"ستظهر الطلبات وحالات التنفيذ ومواعيد التسليم بعد ربط قاعدة بيانات الطلبات.":active==="customers"?"سيُعرض ملف كل عميل وسجل طلباته عند تفعيل تخزين بيانات العملاء.":active==="quotes"?"تجهيز عروض الأسعار وربطها بأرقام الطلبات والفواتير.":"تنظيم استفسارات العملاء ومتابعة الردود."}</p><span className="status-pill">قسم جاهز للتطوير</span><div className="empty-module-actions"><button className="btn primary" onClick={()=>setActive("products")}>العودة إلى المنتجات</button><a className="btn secondary" href="mailto:info@rokn-art-works.com">التواصل مع فريق التطوير</a></div></section>}
+        {active!=="overview"&&active!=="categories"&&active!=="products"&&active!=="settings"&&active!=="designs"&&active!=="orders"&&active!=="quotes"&&<section className="panel empty-module"><div className="empty-icon"><LayoutGrid size={25}/></div><h2>{current}</h2><p>{active==="orders"?"ستظهر الطلبات وحالات التنفيذ ومواعيد التسليم بعد ربط قاعدة بيانات الطلبات.":active==="customers"?"سيُعرض ملف كل عميل وسجل طلباته عند تفعيل تخزين بيانات العملاء.":active==="quotes"?"تجهيز عروض الأسعار وربطها بأرقام الطلبات والفواتير.":"تنظيم استفسارات العملاء ومتابعة الردود."}</p><span className="status-pill">قسم جاهز للتطوير</span><div className="empty-module-actions"><button className="btn primary" onClick={()=>setActive("products")}>العودة إلى المنتجات</button><a className="btn secondary" href="mailto:info@rokn-art-works.com">التواصل مع فريق التطوير</a></div></section>}
         <footer className="admin-footer">© {new Date().getFullYear()} ركن للأعمال الفنية <span>لوحة الإدارة · نسخة أولية</span></footer>
       </div>
     </section>
