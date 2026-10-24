@@ -16,14 +16,19 @@ function pool() {
   });
   return globalForPool.roknDesignPool;
 }
+let schemaReady: Promise<void> | null = null;
 async function ensureTable() {
-  await pool().query(`CREATE TABLE IF NOT EXISTS design_templates (
-    id TEXT PRIMARY KEY, title TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'عام',
-    description TEXT NOT NULL DEFAULT '', image TEXT NOT NULL DEFAULT '',
-    published BOOLEAN NOT NULL DEFAULT TRUE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )`);
-}
-function unavailable() {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      await pool().query(`CREATE TABLE IF NOT EXISTS design_templates (
+          id TEXT PRIMARY KEY, title TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'عام',
+          description TEXT NOT NULL DEFAULT '', image TEXT NOT NULL DEFAULT '',
+          published BOOLEAN NOT NULL DEFAULT TRUE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    })().catch((error) => { schemaReady = null; throw error; });
+  }
+  await schemaReady;
+}function unavailable() {
   return NextResponse.json({ error: "تخزين القوالب غير مربوط بعد. يلزم ربط DATABASE_URL بقاعدة PostgreSQL في Render." }, { status: 503 });
 }
 export async function GET() {
