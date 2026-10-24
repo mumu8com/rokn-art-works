@@ -32,6 +32,7 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders,setOrders] = useState<StoreOrder[]>([]);
   const [quotes,setQuotes] = useState<StoreQuote[]>([]);
+  const [newQuoteCount,setNewQuoteCount] = useState(0);
   const [categories, setCategories] = useState<string[]>(defaultCategories);
   const [newCategory, setNewCategory] = useState("");
   const [search, setSearch] = useState("");
@@ -81,9 +82,40 @@ export default function AdminDashboard() {
         }
       }).catch(error=>setNotice(error instanceof Error?error.message:"تعذر تحميل المنتجات من قاعدة البيانات."));
       fetch("/api/orders").then(async r=>{const d=await r.json();if(r.ok)setOrders(d.orders||[]);}).catch(()=>{});
-      fetch("/api/quotes").then(async r=>{const d=await r.json();if(r.ok)setQuotes(d.quotes||[]);}).catch(()=>{});
     } catch {}
     fetch("/api/design-templates").then(async r=>{const data=await r.json();if(r.ok){const templates=data.templates||[];setDesignTemplates(templates);if(templates.length)setBackgroundTemplateId(templates[0].id);}}).catch(()=>{});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let initialized = false;
+    let knownQuoteIds = new Set<string>();
+    const refreshQuotes = async () => {
+      try {
+        const response = await fetch("/api/quotes", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.quotes) || cancelled) return;
+        const latest = data.quotes as StoreQuote[];
+        const latestIds = new Set(latest.map(q => q.id));
+        if (initialized) {
+          const fresh = latest.filter(q => !knownQuoteIds.has(q.id));
+          if (fresh.length) {
+            setNewQuoteCount(count => count + fresh.length);
+            setNotice(fresh.length === 1
+              ? "وصل طلب عرض سعر جديد من " + fresh[0].customerName + ". افتح قسم عروض الأسعار لمراجعته."
+              : "وصلت " + fresh.length + " طلبات عروض أسعار جديدة. افتح قسم عروض الأسعار لمراجعتها.");
+          }
+        }
+        knownQuoteIds = latestIds;
+        initialized = true;
+        setQuotes(latest);
+      } catch {
+        // Keep the last successful list visible if a refresh temporarily fails.
+      }
+    };
+    void refreshQuotes();
+    const timer = window.setInterval(refreshQuotes, 15000);
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
   function saveCategories(next: string[]) {
@@ -300,12 +332,12 @@ export default function AdminDashboard() {
       <div className="admin-brand"><div className="brand-mark">ر</div><div><strong>ركن</strong><span>مساحة إدارة الأعمال</span></div><button className="sidebar-close" onClick={()=>setMobileNav(false)} aria-label="إغلاق القائمة"><X size={18}/></button></div>
       <div className="workspace-chip"><span className="workspace-dot"/><div><b>متجر ركن</b><small>المساحة الرئيسية</small></div><ChevronLeft size={16}/></div>
       <p className="side-label">إدارة المتجر</p>
-      <nav className="admin-nav">{navItems.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>{setActive(item.id);setMobileNav(false)}} className={active===item.id?"active":""}><Icon size={18}/><span>{item.label}</span>{item.id==="orders"&&<em>3</em>}</button>})}</nav>
+      <nav className="admin-nav">{navItems.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>{setActive(item.id);setMobileNav(false);if(item.id==="quotes")setNewQuoteCount(0)}} className={active===item.id?"active":""}><Icon size={18}/><span>{item.label}</span>{item.id==="quotes"&&newQuoteCount>0&&<em>{newQuoteCount}</em>}{item.id==="orders"&&<em>{orders.length||0}</em>}</button>})}</nav>
       <div className="sidebar-bottom"><div className="help-card"><CircleHelp size={19}/><b>تحتاج إلى مساعدة؟</b><p>تعرّف على خطوات إدارة متجرك.</p><a href="mailto:info@rokn-art-works.com">تواصل مع الدعم <ArrowDownLeft size={14}/></a></div><button className="logout-button" onClick={logout}><LogOut size={17}/> تسجيل الخروج</button></div>
     </aside>
     {mobileNav&&<button className="nav-scrim" aria-label="إغلاق القائمة" onClick={()=>setMobileNav(false)}/>}
     <section className="admin-main">
-      <header className="admin-topbar"><div className="topbar-heading"><button className="mobile-menu" onClick={()=>setMobileNav(true)} aria-label="فتح القائمة"><Menu size={20}/></button><div><div className="breadcrumb">ركن <ChevronLeft size={13}/> لوحة التحكم <ChevronLeft size={13}/> <b>{current}</b></div><h1>{current}</h1></div></div><div className="topbar-actions"><a className="store-link" href="/" target="_blank" rel="noreferrer"><ArrowUpLeft size={16}/> عرض المتجر</a><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotice("لا توجد إشعارات جديدة.")}><Bell size={18}/><i/></button><div className="admin-avatar">م</div><div className="admin-user"><b>مدير المتجر</b><span>صلاحية المدير</span></div></div></header>
+      <header className="admin-topbar"><div className="topbar-heading"><button className="mobile-menu" onClick={()=>setMobileNav(true)} aria-label="فتح القائمة"><Menu size={20}/></button><div><div className="breadcrumb">ركن <ChevronLeft size={13}/> لوحة التحكم <ChevronLeft size={13}/> <b>{current}</b></div><h1>{current}</h1></div></div><div className="topbar-actions"><a className="store-link" href="/" target="_blank" rel="noreferrer"><ArrowUpLeft size={16}/> عرض المتجر</a><button className="icon-button" aria-label="الإشعارات" onClick={()=>{setActive("quotes");setNewQuoteCount(0);setNotice(quotes.length?"تم فتح قسم عروض الأسعار.":"لا توجد طلبات عروض أسعار حتى الآن.");}}><Bell size={18}/>{newQuoteCount>0&&<i/>}</button><div className="admin-avatar">م</div><div className="admin-user"><b>مدير المتجر</b><span>صلاحية المدير</span></div></div></header>
       <div className="admin-content">
         {notice&&<div className="admin-notice"><CheckCircle2 size={16}/>{notice}<button onClick={()=>setNotice("")} aria-label="إغلاق"><X size={15}/></button></div>}
         {active==="overview"&&<><div className="welcome-row"><div><span className="eyebrow">ملخص النشاط</span><h2>أهلًا بك في مساحة عملك 👋</h2><p>تابع المنتجات والتصميمات وأحدث حركة المتجر من مكان واحد.</p></div><button className="btn primary" onClick={()=>{setActive("products");setShowForm(true)}}><Plus size={17}/> إضافة منتج</button></div>
