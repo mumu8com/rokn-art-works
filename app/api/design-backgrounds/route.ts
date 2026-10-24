@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     const assetType = params.get("type") === "base" ? "base" : "background";
     if (!templateId) return NextResponse.json({ error: "معرّف القالب مطلوب." }, { status: 400 });
     const result = await pool().query(
-      'SELECT id,template_id AS "templateId",title,image,asset_type AS "assetType", COALESCE(placement_x, CASE WHEN asset_type='base' THEN 15 ELSE 0 END) AS "placementX", COALESCE(placement_y, CASE WHEN asset_type='base' THEN 20 ELSE 0 END) AS "placementY", COALESCE(placement_width, CASE WHEN asset_type='base' THEN 70 ELSE 100 END) AS "placementWidth", COALESCE(placement_height, CASE WHEN asset_type='base' THEN 60 ELSE 100 END) AS "placementHeight", created_at AS "createdAt" FROM design_backgrounds WHERE template_id=$1 AND asset_type=$2 ORDER BY created_at DESC',
+      `SELECT id, template_id AS "templateId", title, image, asset_type AS "assetType", COALESCE(placement_x, CASE WHEN asset_type='base' THEN 15 ELSE 0 END) AS "placementX", COALESCE(placement_y, CASE WHEN asset_type='base' THEN 20 ELSE 0 END) AS "placementY", COALESCE(placement_width, CASE WHEN asset_type='base' THEN 70 ELSE 100 END) AS "placementWidth", COALESCE(placement_height, CASE WHEN asset_type='base' THEN 60 ELSE 100 END) AS "placementHeight", created_at AS "createdAt" FROM design_backgrounds WHERE template_id=$1 AND asset_type=$2 ORDER BY created_at DESC`,
       [templateId.slice(0,100), assetType]
     );
     return NextResponse.json({ backgrounds: result.rows });
