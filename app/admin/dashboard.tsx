@@ -32,12 +32,18 @@ export default function AdminDashboard() {
   const [form, setForm] = useState({name:"",category:"دروع",price:"حسب الطلب",description:""});
   const [editingId, setEditingId] = useState<number | null>(null);
   const [whatsappNumber, setWhatsappNumber] = useState("");
+  type DesignTemplate = {id:string;title:string;category:string;description:string;image:string;published:boolean};
+  const [designTemplates,setDesignTemplates] = useState<DesignTemplate[]>([]);
+  const [templateForm,setTemplateForm] = useState<DesignTemplate>({id:"",title:"",category:"دروع",description:"",image:"",published:true});
+  const [templateFormOpen,setTemplateFormOpen] = useState(false);
+  const [templateSaving,setTemplateSaving] = useState(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("rokn-admin-products"); if (saved) setProducts(JSON.parse(saved));
       setWhatsappNumber(localStorage.getItem("rokn-whatsapp-number") || "");
     } catch {}
+    fetch("/api/design-templates").then(async r=>{const data=await r.json();if(r.ok)setDesignTemplates(data.templates||[]);}).catch(()=>{});
   }, []);
 
   function saveProducts(next: Product[]): boolean {
@@ -70,6 +76,34 @@ export default function AdminDashboard() {
     await fetch("/api/admin/logout", {method:"POST"});
     router.replace("/admin/login");
     router.refresh();
+  }
+  async function saveDesignTemplate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!templateForm.title.trim()) { setNotice("يرجى إدخال اسم القالب."); return; }
+    setTemplateSaving(true);
+    try {
+      const response=await fetch("/api/design-templates",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(templateForm)});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error||"تعذر حفظ القالب");
+      setDesignTemplates(prev=>[data.template,...prev.filter(t=>t.id!==data.template.id)]);
+      setTemplateForm({id:"",title:"",category:"دروع",description:"",image:"",published:true});
+      setTemplateFormOpen(false);
+      setNotice("تم حفظ القالب في قاعدة البيانات المشتركة، وسيظهر في استوديو التصميم.");
+    } catch(err) { setNotice(err instanceof Error?err.message:"تعذر حفظ القالب."); }
+    finally { setTemplateSaving(false); }
+  }
+  function loadTemplateImage(file?: File) {
+    if(!file)return;
+    if(!file.type.startsWith("image/")) { setNotice("اختر ملف صورة صالحًا."); return; }
+    if(file.size>5*1024*1024) { setNotice("الحد الأقصى لحجم الصورة 5 ميغابايت."); return; }
+    const reader=new FileReader();
+    reader.onload=()=>setTemplateForm(prev=>({...prev,image:String(reader.result||"")}));
+    reader.readAsDataURL(file);
+  }
+  async function deleteDesignTemplate(id:string) {
+    if(!confirm("هل تريد حذف هذا القالب من الاستوديو؟")) return;
+    try { const response=await fetch("/api/design-templates?id="+encodeURIComponent(id),{method:"DELETE"});const data=await response.json();if(!response.ok)throw new Error(data.error||"تعذر الحذف");setDesignTemplates(prev=>prev.filter(t=>t.id!==id));setNotice("تم حذف القالب."); }
+    catch(err){setNotice(err instanceof Error?err.message:"تعذر حذف القالب.");}
   }
   const filtered = useMemo(() => products.filter(p => (p.name+" "+p.category+" "+p.description).toLowerCase().includes(search.toLowerCase())), [products,search]);
   const current = navItems.find(n=>n.id===active)?.label || "نظرة عامة";
