@@ -11,3 +11,19 @@
 @media(max-width:1050px){.editor-layout{grid-template-columns:280px minmax(0,1fr)}.editor-layout>.editor-panel:last-child{grid-column:1/-1}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-grid{grid-template-columns:1fr}.services-grid{grid-template-columns:repeat(2,1fr)}.hero{gap:30px}.hero-visual{min-height:360px}}
 @media(max-width:760px){.wrap{padding:15px 18px}.nav{align-items:flex-start;flex-direction:column}.links{gap:13px}.hero{grid-template-columns:1fr;padding:38px 0 48px;gap:28px}.hero h1{font-size:39px}.hero-visual{min-height:330px}.product-grid{grid-template-columns:1fr}.product-art{height:235px}.section{padding:34px 0}.section-heading{align-items:flex-start;flex-direction:column}.services-grid{grid-template-columns:1fr 1fr}.cta-panel{padding:25px;align-items:flex-start;flex-direction:column}.footer{margin-top:25px}.editor-shell{padding:14px}.editor-top{align-items:flex-start;gap:12px}.editor-layout{grid-template-columns:1fr}.editor-stage{grid-row:1;min-height:470px}.editor-layout>.editor-panel:last-child{grid-column:auto}.stage-product{width:min(260px,80%)}.admin-sidebar{position:fixed;right:0;top:0;bottom:0;height:100dvh;transform:translateX(110%);transition:transform .22s;box-shadow:none}.admin-sidebar.mobile-open{transform:translateX(0);box-shadow:-15px 0 40px #102b4318}.sidebar-close{display:grid;place-items:center}.nav-scrim{display:block;position:fixed;inset:0;background:#102b4355;border:0;z-index:15}.admin-topbar{padding:14px 16px;min-height:75px}.mobile-menu{display:grid;flex-shrink:0}.breadcrumb{display:none}.topbar-heading h1{font-size:18px}.admin-user{display:none}.topbar-actions{gap:7px}.store-link{font-size:0;padding:9px}.store-link svg{width:18px;height:18px}.admin-content{padding:20px 14px}.welcome-row,.section-intro{align-items:flex-start;flex-direction:column}.stats-grid{gap:9px}.stat-card{padding:13px}.stat-card strong{font-size:22px}.setup-banner{align-items:flex-start;flex-wrap:wrap}.setup-banner .status-pill{margin-right:51px}.admin-footer{flex-direction:column}.panel{padding:14px}.form-row{grid-template-columns:1fr}.empty-module{margin:35px auto;padding:30px 18px}.login-card{padding:25px}.services-grid{gap:10px}}
 @media(max-width:420px){.services-grid{grid-template-columns:1fr}.hero h1{font-size:34px}.hero-actions .btn{width:100%}.topbar-actions{gap:5px}.admin-avatar{width:32px;height:32px}.stats-grid{grid-template-columns:1fr 1fr}.stat-card small{font-size:9px}.stage-canvas{padding:20px 10px}}
+
+
+/* Responsive layout for the rebuilt Rukn design studio */
+@media (max-width: 1120px) {
+  .rokn-design-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+  .rokn-design-workspace > section { grid-column: 1 / -1; grid-row: 1; }
+  .rokn-design-workspace > aside:first-child { grid-column: 1; grid-row: 2; }
+  .rokn-design-workspace > aside:last-child { grid-column: 2; grid-row: 2; }
+}
+@media (max-width: 680px) {
+  .rokn-design-workspace { grid-template-columns: minmax(0, 1fr) !important; width: calc(100% - 20px) !important; gap: 10px !important; }
+  .rokn-design-workspace > section,
+  .rokn-design-workspace > aside:first-child,
+  .rokn-design-workspace > aside:last-child { grid-column: 1; grid-row: auto; }
+  .rokn-design-stage { aspect-ratio: 4 / 3 !important; }
+}
