@@ -64,6 +64,7 @@ export default function DesignPage() {
     const reader=new FileReader();reader.onload=()=>{const item={id:Date.now(),kind:"image" as const,value:String(reader.result||""),x:50,y:50,size:72,color:"#ffffff"};setElements(prev=>[...prev,item]);setSelectedElement(item.id);setNotice("تمت إضافة الشعار؛ اسحبه إلى المكان المطلوب.");};reader.readAsDataURL(file);
   }
   function updateSelected(patch:Partial<ElementItem>) {setElements(prev=>prev.map(e=>e.id===selectedElement?{...e,...patch}:e));}
+  function moveSelected(dx:number,dy:number) {setElements(prev=>prev.map(e=>e.id===selectedElement?{...e,x:Math.max(3,Math.min(97,e.x+dx)),y:Math.max(3,Math.min(97,e.y+dy))}:e));}
   function exportSvg() {
     const blob=new Blob([svg],{type:"image/svg+xml;charset=utf-8"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="rokn-custom-design.svg";a.click();URL.revokeObjectURL(url);
@@ -76,14 +77,20 @@ export default function DesignPage() {
     window.location.href="mailto:info@rokn-art-works.com?subject="+subject+"&body="+body;
   }
   function sendWhatsApp() {
-    const phone=customer.phone.trim().replace(/[^\d]/g,"");
+    const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+    const phone=normalizeDigits(customer.phone).replace(/\D/g,"");
     if(!customer.name.trim()||!phone){setNotice("أدخل اسمك ورقم هاتفك أولًا.");return;}
     let target="";
     try {target=localStorage.getItem("rokn-whatsapp-number")||"";}catch{}
-    if(!target){setNotice("لم يُحدد رقم واتساب الاستقبال من إعدادات الإدارة بعد. سنجهز الطلب دون إرساله.");return;}
+    target=normalizeDigits(target).replace(/\D/g,"");
+    if(target.startsWith("00")) target=target.slice(2);
+    if(target.startsWith("0")) target="218"+target.slice(1);
+    if(target.length<10){setNotice("رقم واتساب الاستقبال غير محفوظ أو غير صحيح في هذا المتصفح. افتح لوحة الإدارة من نفس المتصفح، واحفظ الرقم بصيغة دولية مثل 2189XXXXXXXX، ثم أعد المحاولة.");return;}
     const message="طلب حجز جديد - ركن للأعمال الفنية\nالعميل: "+customer.name+"\nهاتف العميل: "+phone+"\nالمنتج: "+current.name+"\nالخامة: "+material+"\nالمقاس: "+size+"\nالكمية: "+quantity+"\nالعربون المقترح: "+(customer.deposit||"يحدد بعد التسعير")+"\nملاحظات: "+(notes||"لا توجد")+"\nحالة الدفع: بانتظار تأكيد الإدارة";
-    window.open("https://wa.me/"+target.replace(/[^\d]/g,"")+"?text="+encodeURIComponent(message),"_blank","noopener,noreferrer");
-    setNotice("تم تجهيز رسالة واتساب. هذا لا يؤكد دفع العربون؛ يجب التحقق من الدفع يدويًا.");
+    const whatsappUrl="https://wa.me/"+target+"?text="+encodeURIComponent(message);
+    const opened=window.open(whatsappUrl,"_blank");
+    if(!opened){setNotice("منع المتصفح فتح واتساب. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.");return;}
+    setNotice("فتحنا واتساب برسالة الطلب. اضغط إرسال داخل واتساب لإتمام الإرسال؛ لا يُعد ذلك تأكيدًا لدفع العربون.");
   }
 
   return <main className="editor-shell" dir="rtl">
@@ -109,10 +116,10 @@ export default function DesignPage() {
       </section>
       <section className="editor-panel"><h3>2. النصوص والشعارات</h3>
         <button className="btn secondary" style={{width:"100%",justifyContent:"center"}} onClick={addText}><Plus size={16}/> إضافة نص</button>
-        <div style={{marginTop:12,marginBottom:12}}><label className="field-label" style={{display:"block",marginBottom:8}}>إضافة شعار أو صورة إلى التصميم</label><label className="btn primary" style={{width:"100%",justifyContent:"center",gap:8,cursor:"pointer"}}><ImagePlus size={17}/> اضغط هنا لرفع الشعار أو الصورة<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={e=>{addLogo(e.target.files?.[0]);e.currentTarget.value="";}} style={{position:"absolute",width:1,height:1,opacity:0,pointerEvents:"none"}}/></label><p className="editor-help">اختر صورة من جهازك، ثم اسحبها داخل المعاينة لتحديد مكانها.</p></div>
+        <div style={{marginTop:12,marginBottom:12,padding:12,border:"1px dashed #8ca3b5",borderRadius:10}}><label className="field-label" htmlFor="logo-upload" style={{display:"block",marginBottom:8,fontWeight:700}}>إضافة شعار أو صورة إلى التصميم</label><input id="logo-upload" type="file" accept="image/*" onChange={e=>{addLogo(e.target.files?.[0]);e.currentTarget.value="";}} style={{display:"block",width:"100%",padding:8,background:"#fff",border:"1px solid #ccd6df",borderRadius:8}}/><p className="editor-help">اختر ملف صورة من جهازك. بعد تحميله، حدده وعدّل موضعه من أدوات التحكم أو اسحبه بالماوس.</p></div>
         {elements.map(item=><div key={item.id} style={{border:"1px solid #e5eaf0",borderRadius:10,padding:10,marginTop:9,background:selectedElement===item.id?"#f5f8fb":"#fff"}}><div style={{display:"flex",alignItems:"center",gap:8}}><button className="btn secondary" onClick={()=>setSelectedElement(item.id)}>{item.kind==="text"?<Type size={14}/>:<ImagePlus size={14}/>} تحديد العنصر</button><span style={{flex:1,fontSize:12}}>{item.kind==="text"?"نص":"شعار / صورة"}</span><button className="btn secondary" aria-label="حذف العنصر" onClick={()=>{setElements(prev=>prev.filter(x=>x.id!==item.id));if(selectedElement===item.id)setSelectedElement(0);}}><Trash2 size={14}/></button></div>
           {item.kind==="text"&&<input aria-label="محتوى النص" value={item.value} onChange={e=>setElements(prev=>prev.map(x=>x.id===item.id?{...x,value:e.target.value}:x))} style={{marginTop:8}}/>}
-          {selectedElement===item.id&&<><label className="field-label">حجم العنصر</label><input type="range" min="10" max="60" value={item.size} onChange={e=>updateSelected({size:Number(e.target.value)})}/>{item.kind==="text"&&<><label className="field-label">لون النص</label><input type="color" value={item.color} onChange={e=>updateSelected({color:e.target.value})}/></>}<p className="editor-help">الموضع الأفقي: {Math.round(item.x)}% · العمودي: {Math.round(item.y)}%</p></>}
+          {selectedElement===item.id&&<><label className="field-label">حجم العنصر</label><input type="range" min="10" max="60" value={item.size} onChange={e=>updateSelected({size:Number(e.target.value)})}/>{item.kind==="text"&&<><label className="field-label">لون النص</label><input type="color" value={item.color} onChange={e=>updateSelected({color:e.target.value})}/></>}<p className="editor-help">الموضع الأفقي: {Math.round(item.x)}% · العمودي: {Math.round(item.y)}%</p><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,maxWidth:230,marginTop:8}}><span/><button type="button" className="btn secondary" onClick={()=>moveSelected(0,-2)} aria-label="تحريك لأعلى">↑ أعلى</button><span/><button type="button" className="btn secondary" onClick={()=>moveSelected(-2,0)} aria-label="تحريك لليسار">← يسار</button><button type="button" className="btn secondary" onClick={()=>moveSelected(0,2)} aria-label="تحريك لأسفل">↓ أسفل</button><button type="button" className="btn secondary" onClick={()=>moveSelected(2,0)} aria-label="تحريك لليمين">يمين →</button></div><label className="field-label">الموضع الأفقي</label><input type="range" min="3" max="97" value={item.x} onChange={e=>updateSelected({x:Number(e.target.value)})}/><label className="field-label">الموضع العمودي</label><input type="range" min="3" max="97" value={item.y} onChange={e=>updateSelected({y:Number(e.target.value)})}/></>}
         </div>)}
         <h3 style={{marginTop:22}}>3. تفاصيل المنتج</h3>
         <label className="field-label" htmlFor="title">العنوان الرئيسي</label><input id="title" maxLength={80} value={title} onChange={e=>setTitle(e.target.value)} placeholder="شكر وتقدير"/>
