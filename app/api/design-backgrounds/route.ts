@@ -24,6 +24,10 @@ async function ensureTable() {
           image TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`);
         await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS asset_type TEXT NOT NULL DEFAULT 'background'");
+        await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS placement_x INTEGER");
+        await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS placement_y INTEGER");
+        await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS placement_width INTEGER");
+        await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS placement_height INTEGER");
     })().catch((error) => { schemaReady = null; throw error; });
   }
   await schemaReady;
@@ -36,7 +40,7 @@ export async function GET(request: Request) {
     const assetType = params.get("type") === "base" ? "base" : "background";
     if (!templateId) return NextResponse.json({ error: "معرّف القالب مطلوب." }, { status: 400 });
     const result = await pool().query(
-      'SELECT id,template_id AS "templateId",title,image,asset_type AS "assetType",created_at AS "createdAt" FROM design_backgrounds WHERE template_id=$1 AND asset_type=$2 ORDER BY created_at DESC',
+      'SELECT id,template_id AS "templateId",title,image,asset_type AS "assetType", COALESCE(placement_x, CASE WHEN asset_type='base' THEN 15 ELSE 0 END) AS "placementX", COALESCE(placement_y, CASE WHEN asset_type='base' THEN 20 ELSE 0 END) AS "placementY", COALESCE(placement_width, CASE WHEN asset_type='base' THEN 70 ELSE 100 END) AS "placementWidth", COALESCE(placement_height, CASE WHEN asset_type='base' THEN 60 ELSE 100 END) AS "placementHeight", created_at AS "createdAt" FROM design_backgrounds WHERE template_id=$1 AND asset_type=$2 ORDER BY created_at DESC',
       [templateId.slice(0,100), assetType]
     );
     return NextResponse.json({ backgrounds: result.rows });
@@ -68,6 +72,25 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === "DATABASE_URL_MISSING") return NextResponse.json({ error: "قاعدة البيانات غير متصلة." }, { status: 503 });
     console.error("design_backgrounds_save_failed", error);
     return NextResponse.json({ error: "تعذر حفظ صورة الخلفية." }, { status: 503 });
+  }
+}
+export async function PATCH(request: Request) {
+  if (!(await isAdminSessionValid())) return NextResponse.json({ error: "يلزم تسجيل دخول المدير." }, { status: 401 });
+  try {
+    const body = await request.json() as { id?: unknown; placementX?: unknown; placementY?: unknown; placementWidth?: unknown; placementHeight?: unknown };
+    const id = typeof body.id === "string" ? body.id : "";
+    const values = [body.placementX, body.placementY, body.placementWidth, body.placementHeight];
+    if (!id || values.some(v => typeof v !== "number" || !Number.isFinite(v))) return NextResponse.json({ error: "معرّف الصورة وقياسات الموضع مطلوبة." }, { status: 400 });
+    const [x,y,width,height] = values as number[];
+    if (x < 0 || x > 100 || y < 0 || y > 100 || width < 5 || width > 100 || height < 5 || height > 100 || x + width > 100 || y + height > 100) return NextResponse.json({ error: "يجب أن تبقى الصورة داخل حدود التصميم (0–100%)." }, { status: 400 });
+    await ensureTable();
+    const result = await pool().query('UPDATE design_backgrounds SET placement_x=$2, placement_y=$3, placement_width=$4, placement_height=$5 WHERE id=$1 RETURNING id, placement_x AS "placementX", placement_y AS "placementY", placement_width AS "placementWidth", placement_height AS "placementHeight"', [id,x,y,width,height]);
+    if (!result.rowCount) return NextResponse.json({ error: "الصورة غير موجودة." }, { status: 404 });
+    return NextResponse.json({ asset: result.rows[0] });
+  } catch (error) {
+    if (error instanceof Error && error.message === "DATABASE_URL_MISSING") return NextResponse.json({ error: "قاعدة البيانات غير متصلة." }, { status: 503 });
+    console.error("design_asset_placement_failed", error);
+    return NextResponse.json({ error: "تعذر حفظ موضع الصورة." }, { status: 503 });
   }
 }
 export async function DELETE(request: Request) {
