@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true });
   response.cookies.set(adminCookie.name, createAdminToken(email.trim().toLowerCase()), {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",
-    path: "/admin", maxAge: adminCookie.maxAge,
+    path: "/", maxAge: adminCookie.maxAge,
   });
   return response;
 }
