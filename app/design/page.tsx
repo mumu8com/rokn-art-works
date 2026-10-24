@@ -82,9 +82,22 @@ export default function DesignPage() {
   function updateSelected(patch:Partial<ElementItem>) {setElements(prev=>prev.map(e=>e.id===selectedElement?{...e,...patch}:e));}
   function moveSelected(dx:number,dy:number) {setElements(prev=>prev.map(e=>e.id===selectedElement?{...e,x:Math.max(3,Math.min(97,e.x+dx)),y:Math.max(3,Math.min(97,e.y+dy))}:e));}
   function exportSvg() {
-    const blob=new Blob([svg],{type:"image/svg+xml;charset=utf-8"});
+    const shape = current.shape==="medal"
+      ? '<circle cx="200" cy="160" r="112" fill="'+color+'" stroke="'+accent+'" stroke-width="8"/><path d="M170 48 L150 5 H185 L200 35 L215 5 H250 L230 48" fill="'+accent+'"/>'
+      : current.shape==="plaque"
+      ? '<rect x="28" y="25" width="344" height="270" rx="12" fill="'+color+'" stroke="'+accent+'" stroke-width="8"/>'
+      : '<path d="M48 35 H352 V205 L200 285 L48 205 Z" fill="'+color+'" stroke="'+accent+'" stroke-width="8"/>';
+    const background = mainImage || templateImage || current.image
+      ? '<image href="'+(mainImage||templateImage||current.image)+'" x="0" y="0" width="400" height="320" preserveAspectRatio="xMidYMid meet"/>'
+      : shape;
+    const layers = elements.map(item => item.kind==="text"
+      ? '<text x="'+(item.x*4)+'" y="'+(item.y*3.2)+'" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="'+item.size+'" font-weight="'+(item.id===1?"700":"500")+'" fill="'+item.color+'">'+safe(item.value)+'</text>'
+      : '<image href="'+item.value+'" x="'+(item.x*4-item.size/2)+'" y="'+(item.y*3.2-item.size/2)+'" width="'+item.size+'" height="'+item.size+'" preserveAspectRatio="xMidYMid meet"/>'
+    ).join("");
+    const output='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3000" height="2400" viewBox="0 0 400 320">'+background+layers+'</svg>';
+    const blob=new Blob([output],{type:"image/svg+xml;charset=utf-8"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="rokn-custom-design.svg";a.click();URL.revokeObjectURL(url);
-    setNotice("تم تنزيل نموذج SVG الأساسي. ملاحظة: العناصر الإضافية والصور لا تُدمج في هذا الملف حتى الآن.");
+    setNotice("تم تنزيل التصميم بصيغة SVG مع تضمين النصوص والشعارات والصور المضافة.");
   }
   function reset() {setTemplateId("shield");setTitle("شكر وتقدير");setSubtitle("تقديرًا لجهودكم وعطائكم");setRecipient("يُكتب الاسم هنا");setColor("#173b53");setAccent("#d7b56d");setMaterial("أكريليك وخشب");setSize(sizes[1]);setQuantity("1");setNotes("");setElements([{id:1,kind:"text",value:"شكر وتقدير",x:50,y:42,size:23,color:"#d7b56d"},{id:2,kind:"text",value:"يُكتب الاسم هنا",x:50,y:55,size:17,color:"#ffffff"},{id:3,kind:"text",value:"تقديرًا لجهودكم وعطائكم",x:50,y:67,size:13,color:"#d7b56d"}]);setSelectedElement(1);setNotice("تمت إعادة الإعدادات إلى القيم الافتراضية.");}
   function requestQuote() {
