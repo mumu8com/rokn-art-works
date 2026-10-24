@@ -20,15 +20,18 @@ async function ensureTable() {
     id TEXT PRIMARY KEY, template_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
     image TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool().query("ALTER TABLE design_backgrounds ADD COLUMN IF NOT EXISTS asset_type TEXT NOT NULL DEFAULT 'background'");
 }
 export async function GET(request: Request) {
   try {
     await ensureTable();
-    const templateId = new URL(request.url).searchParams.get("templateId");
+    const params = new URL(request.url).searchParams;
+    const templateId = params.get("templateId");
+    const assetType = params.get("type") === "base" ? "base" : "background";
     if (!templateId) return NextResponse.json({ error: "معرّف القالب مطلوب." }, { status: 400 });
     const result = await pool().query(
-      'SELECT id,template_id AS "templateId",title,image,created_at AS "createdAt" FROM design_backgrounds WHERE template_id=$1 ORDER BY created_at DESC',
-      [templateId.slice(0,100)]
+      'SELECT id,template_id AS "templateId",title,image,asset_type AS "assetType",created_at AS "createdAt" FROM design_backgrounds WHERE template_id=$1 AND asset_type=$2 ORDER BY created_at DESC',
+      [templateId.slice(0,100), assetType]
     );
     return NextResponse.json({ backgrounds: result.rows });
   } catch (error) {
@@ -40,18 +43,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!(await isAdminSessionValid())) return NextResponse.json({ error: "إضافة صور الخلفية متاحة للمدير بعد تسجيل الدخول." }, { status: 401 });
   try {
-    const body = await request.json() as { templateId?: unknown; title?: unknown; image?: unknown };
+    const body = await request.json() as { templateId?: unknown; title?: unknown; image?: unknown; type?: unknown };
     const templateId = typeof body.templateId === "string" ? body.templateId.trim().slice(0,100) : "";
     const title = typeof body.title === "string" ? body.title.trim().slice(0,120) : "";
     const image = typeof body.image === "string" ? body.image : "";
+    const assetType = body.type === "base" ? "base" : "background";
     if (!templateId || !image) return NextResponse.json({ error: "القالب والصورة مطلوبان." }, { status: 400 });
     if (image.length > 8_000_000) return NextResponse.json({ error: "الصورة كبيرة جدًا؛ اختر صورة أقل من 5 ميغابايت." }, { status: 413 });
     if (!/^data:image\/(png|jpeg|webp|gif);base64,/.test(image)) return NextResponse.json({ error: "صيغة الصورة غير مدعومة. استخدم PNG أو JPG أو WEBP أو GIF." }, { status: 400 });
     await ensureTable();
     const id = crypto.randomUUID();
     const result = await pool().query(
-      'INSERT INTO design_backgrounds (id,template_id,title,image) VALUES ($1,$2,$3,$4) RETURNING id,template_id AS "templateId",title,image,created_at AS "createdAt"',
-      [id,templateId,title || "خلفية جديدة",image]
+      'INSERT INTO design_backgrounds (id,template_id,title,image,asset_type) VALUES ($1,$2,$3,$4,$5) RETURNING id,template_id AS "templateId",title,image,asset_type AS "assetType",created_at AS "createdAt"',
+      [id,templateId,title || (assetType === "base" ? "الشكل" : "خلفية جديدة"),image,assetType]
     );
     return NextResponse.json({ background: result.rows[0] }, { status: 201 });
   } catch (error) {
