@@ -37,13 +37,20 @@ export default function AdminDashboard() {
   const [templateForm,setTemplateForm] = useState<DesignTemplate>({id:"",title:"",category:"دروع",description:"",image:"",published:true});
   const [templateFormOpen,setTemplateFormOpen] = useState(false);
   const [templateSaving,setTemplateSaving] = useState(false);
+  type DesignBackground = {id:string;templateId:string;title:string;image:string;createdAt?:string};
+  const [backgroundTemplateId,setBackgroundTemplateId] = useState("");
+  const [backgroundTitle,setBackgroundTitle] = useState("");
+  const [backgroundImage,setBackgroundImage] = useState("");
+  const [designBackgrounds,setDesignBackgrounds] = useState<DesignBackground[]>([]);
+  const [backgroundSaving,setBackgroundSaving] = useState(false);
+  const [backgroundLoading,setBackgroundLoading] = useState(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("rokn-admin-products"); if (saved) setProducts(JSON.parse(saved));
       setWhatsappNumber(localStorage.getItem("rokn-whatsapp-number") || "");
     } catch {}
-    fetch("/api/design-templates").then(async r=>{const data=await r.json();if(r.ok)setDesignTemplates(data.templates||[]);}).catch(()=>{});
+    fetch("/api/design-templates").then(async r=>{const data=await r.json();if(r.ok){const templates=data.templates||[];setDesignTemplates(templates);if(templates.length)setBackgroundTemplateId(templates[0].id);}}).catch(()=>{});
   }, []);
 
   function saveProducts(next: Product[]): boolean {
@@ -100,6 +107,51 @@ export default function AdminDashboard() {
     reader.onload=()=>setTemplateForm(prev=>({...prev,image:String(reader.result||"")}));
     reader.readAsDataURL(file);
   }
+  useEffect(() => {
+    if (!backgroundTemplateId) { setDesignBackgrounds([]); return; }
+    let cancelled = false;
+    setBackgroundLoading(true);
+    fetch("/api/design-backgrounds?templateId="+encodeURIComponent(backgroundTemplateId))
+      .then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error||"تعذر تحميل الخلفيات");if(!cancelled)setDesignBackgrounds(data.backgrounds||[]);})
+      .catch(err=>{if(!cancelled)setNotice(err instanceof Error?err.message:"تعذر تحميل الخلفيات المحفوظة.");})
+      .finally(()=>{if(!cancelled)setBackgroundLoading(false);});
+    return ()=>{cancelled=true;};
+  }, [backgroundTemplateId]);
+
+  function loadBackgroundImage(file?: File) {
+    if(!file)return;
+    if(!file.type.startsWith("image/")){setNotice("اختر ملف صورة صالحًا.");return;}
+    if(file.size>5*1024*1024){setNotice("الحد الأقصى لحجم الخلفية 5 ميغابايت.");return;}
+    const reader=new FileReader();
+    reader.onload=()=>setBackgroundImage(String(reader.result||""));
+    reader.readAsDataURL(file);
+  }
+  async function saveDesignBackground(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if(!backgroundTemplateId){setNotice("أضف قالبًا أولًا ثم اختره لحفظ خلفياته.");return;}
+    if(!backgroundImage){setNotice("اختر صورة الخلفية أولًا.");return;}
+    setBackgroundSaving(true);
+    try {
+      const response=await fetch("/api/design-backgrounds",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({templateId:backgroundTemplateId,title:backgroundTitle.trim()||"خلفية جديدة",image:backgroundImage})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"تعذر حفظ الخلفية");
+      setDesignBackgrounds(prev=>[data.background,...prev]);
+      setBackgroundTitle("");
+      setBackgroundImage("");
+      setNotice("تم حفظ الخلفية وربطها بالقالب المحدد فقط.");
+    } catch(err) { setNotice(err instanceof Error?err.message:"تعذر حفظ الخلفية."); }
+    finally { setBackgroundSaving(false); }
+  }
+  async function deleteDesignBackground(id:string) {
+    if(!confirm("هل تريد حذف صورة الخلفية المحفوظة؟"))return;
+    try {
+      const response=await fetch("/api/design-backgrounds?id="+encodeURIComponent(id),{method:"DELETE"});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"تعذر حذف الخلفية");
+      setDesignBackgrounds(prev=>prev.filter(bg=>bg.id!==id));
+      setNotice("تم حذف الخلفية المحفوظة.");
+    } catch(err) { setNotice(err instanceof Error?err.message:"تعذر حذف الخلفية."); }
+  }
   async function deleteDesignTemplate(id:string) {
     if(!confirm("هل تريد حذف هذا القالب من الاستوديو؟")) return;
     try { const response=await fetch("/api/design-templates?id="+encodeURIComponent(id),{method:"DELETE"});const data=await response.json();if(!response.ok)throw new Error(data.error||"تعذر الحذف");setDesignTemplates(prev=>prev.filter(t=>t.id!==id));setNotice("تم حذف القالب."); }
@@ -142,6 +194,24 @@ export default function AdminDashboard() {
           </form>}
           {designTemplates.length===0&&!templateFormOpen&&<div className="panel empty-module"><div className="empty-icon"><FileImage size={25}/></div><h3>لا توجد قوالب محفوظة حتى الآن</h3><p>اضغط «إضافة قالب» لرفع أول صورة. إذا ظهر خطأ اتصال، يلزم ربط قاعدة بيانات PostgreSQL في إعدادات Render.</p><button className="btn primary" onClick={()=>setTemplateFormOpen(true)}>إضافة أول قالب</button></div>}
           <div className="grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:16}}>{designTemplates.map(t=><article className="panel" key={t.id} style={{padding:14}}><div style={{height:170,background:"#f4f6f9",borderRadius:12,display:"grid",placeItems:"center",overflow:"hidden"}}>{t.image?<img src={t.image} alt={t.title} style={{width:"100%",height:"100%",objectFit:"contain"}}/>:<FileImage size={36}/>}</div><div style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}><b style={{flex:1}}>{t.title}</b><span className="product-status published">{t.published?"منشور":"مسودة"}</span></div><small style={{display:"block",color:"#718096",marginTop:4}}>{t.category}</small><p style={{fontSize:13,color:"#718096"}}>{t.description}</p><div className="row-actions"><button onClick={()=>{setTemplateForm(t);setTemplateFormOpen(true)}}>تعديل</button><button className="delete-action" onClick={()=>deleteDesignTemplate(t.id)}>حذف</button></div></article>)}</div>
+          <section className="panel product-form" style={{marginTop:20}}>
+            <div className="panel-head"><div><h3>مكتبة صور الخلفية المحفوظة</h3><p>ارفع صور الخلفية من الإدارة واربطها بقالب محدد؛ لن تظهر خلفيات قالب داخل قالب آخر.</p></div></div>
+            {designTemplates.length===0?<p className="editor-help">أضف قالبًا أولًا حتى تتمكن من حفظ صور خلفية خاصة به.</p>:<>
+              <label>القالب الذي ستُحفظ خلفياته
+                <select value={backgroundTemplateId} onChange={e=>{setBackgroundTemplateId(e.target.value);setBackgroundTitle("");setBackgroundImage("");}}>{designTemplates.map(t=><option key={t.id} value={t.id}>{t.title} — {t.category}</option>)}</select>
+              </label>
+              <form onSubmit={saveDesignBackground}>
+                <label>اسم الخلفية<input value={backgroundTitle} maxLength={120} onChange={e=>setBackgroundTitle(e.target.value)} placeholder="مثال: خلفية ذهبية"/></label>
+                <label>صورة الخلفية (PNG / JPG / WEBP)<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e=>loadBackgroundImage(e.target.files?.[0])}/></label>
+                {backgroundImage&&<div style={{marginTop:10}}><img src={backgroundImage} alt="معاينة الخلفية قبل الحفظ" style={{width:"100%",maxWidth:360,maxHeight:200,objectFit:"contain",borderRadius:10,background:"#f4f6f9"}}/><button type="button" className="btn secondary" onClick={()=>setBackgroundImage("")}>إزالة الصورة المختارة</button></div>}
+                <p className="editor-help">تُحفظ الخلفية في قاعدة البيانات المشتركة ضمن القالب المحدد فقط. الحد الأقصى 5 ميغابايت.</p>
+                <div className="form-actions"><button className="btn primary" type="submit" disabled={backgroundSaving}>{backgroundSaving?"جارٍ الحفظ…":"حفظ الخلفية للقالب"}</button></div>
+              </form>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginTop:18}}>
+                {backgroundLoading?<p>جارٍ تحميل الخلفيات…</p>:designBackgrounds.length===0?<p className="editor-help">لا توجد خلفيات محفوظة لهذا القالب حتى الآن.</p>:designBackgrounds.map(bg=><article key={bg.id} style={{border:"1px solid #e0e6ed",borderRadius:11,padding:9,minWidth:0}}><img src={bg.image} alt={bg.title} style={{width:"100%",height:120,objectFit:"cover",borderRadius:8,background:"#f4f6f9"}}/><b style={{display:"block",fontSize:13,marginTop:8,overflowWrap:"anywhere"}}>{bg.title}</b><button className="btn secondary" type="button" style={{marginTop:8}} onClick={()=>deleteDesignBackground(bg.id)}>حذف الخلفية</button></article>)}
+              </div>
+            </>}
+          </section>
         </>}
         {active!=="overview"&&active!=="products"&&active!=="settings"&&active!=="designs"&&<section className="panel empty-module"><div className="empty-icon"><LayoutGrid size={25}/></div><h2>{current}</h2><p>{active==="orders"?"ستظهر الطلبات وحالات التنفيذ ومواعيد التسليم بعد ربط قاعدة بيانات الطلبات.":active==="customers"?"سيُعرض ملف كل عميل وسجل طلباته عند تفعيل تخزين بيانات العملاء.":active==="quotes"?"تجهيز عروض الأسعار وربطها بأرقام الطلبات والفواتير.":"تنظيم استفسارات العملاء ومتابعة الردود."}</p><span className="status-pill">قسم جاهز للتطوير</span><div className="empty-module-actions"><button className="btn primary" onClick={()=>setActive("products")}>العودة إلى المنتجات</button><a className="btn secondary" href="mailto:info@rokn-art-works.com">التواصل مع فريق التطوير</a></div></section>}
         <footer className="admin-footer">© {new Date().getFullYear()} ركن للأعمال الفنية <span>لوحة الإدارة · نسخة أولية</span></footer>
