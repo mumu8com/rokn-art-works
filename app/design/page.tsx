@@ -1,19 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Download, Layers3, Mail, RotateCcw, Ruler, Sparkles, ImagePlus, Plus, Trash2, ShoppingBag, Move, Type, Upload } from "lucide-react";
 
-const templates = [
-  {id:"shield",name:"درع تكريمي",category:"دروع",shape:"shield",description:"مناسب للتكريم والإنجازات"},
-  {id:"medal",name:"ميدالية تذكارية",category:"ميداليات",shape:"medal",description:"هدية رمزية بلمسة خاصة"},
-  {id:"plaque",name:"لوحة تذكارية",category:"لوحات",shape:"plaque",description:"للمؤسسات والفعاليات"},
+const fallbackTemplates = [
+  {id:"shield",name:"درع تكريمي",category:"دروع",shape:"shield",description:"مناسب للتكريم والإنجازات",image:""},
+  {id:"medal",name:"ميدالية تذكارية",category:"ميداليات",shape:"medal",description:"هدية رمزية بلمسة خاصة",image:""},
+  {id:"plaque",name:"لوحة تذكارية",category:"لوحات",shape:"plaque",description:"للمؤسسات والفعاليات",image:""},
 ];
 const materials = ["أكريليك","خشب","معدن","أكريليك وخشب","حسب توصية فريق ركن"];
 const sizes = ["صغير — 15 × 20 سم","متوسط — 20 × 30 سم","كبير — 30 × 40 سم","مقاس مخصص"];
+type TemplateItem = {id:string;name:string;category:string;shape:string;description:string;image?:string};
 type ElementItem = {id:number;kind:"text"|"image";value:string;x:number;y:number;size:number;color:string};
 
 export default function DesignPage() {
+  const [templates,setTemplates] = useState<TemplateItem[]>(fallbackTemplates);
   const [templateId,setTemplateId] = useState("shield");
   const [title,setTitle] = useState("شكر وتقدير");
   const [subtitle,setSubtitle] = useState("تقديرًا لجهودكم وعطائكم");
@@ -37,6 +39,20 @@ export default function DesignPage() {
   const [showBooking,setShowBooking] = useState(false);
   const [customer,setCustomer] = useState({name:"",phone:"",deposit:""});
   const current = templates.find(t=>t.id===templateId) || templates[0];
+  useEffect(() => {
+    let active = true;
+    fetch("/api/design-templates").then(async response => {
+      const data = await response.json();
+      if (!active || !response.ok || !Array.isArray(data.templates) || !data.templates.length) return;
+      const managed:TemplateItem[] = data.templates.map((item: {id:string;title:string;category:string;description:string;image:string}) => ({
+        id:item.id,name:item.title,category:item.category,description:item.description||"",
+        image:item.image||"",shape:item.category==="ميداليات"?"medal":item.category==="لوحات"?"plaque":"shield"
+      }));
+      setTemplates(managed);
+      setTemplateId(managed[0].id);
+    }).catch(()=>{});
+    return () => { active = false; };
+  }, []);
   const safe = (value:string) => value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;").replaceAll("'","&apos;");
   const svg = useMemo(() => {
     const shape = templateId==="shield"
@@ -98,7 +114,7 @@ export default function DesignPage() {
     <header className="editor-top"><div className="editor-title"><Link href="/" className="brand-mark">ر</Link><div><h1>استوديو تصميم ركن</h1><p>صمّم معاينتك، أضف الشعارات والنصوص، ثم جهّز طلبك</p></div></div><Link href="/" className="btn secondary"><ArrowRight size={16}/> العودة للمتجر</Link></header>
     <div className="editor-layout">
       <section className="editor-panel"><h3><Layers3 size={17} style={{display:"inline",verticalAlign:"middle",marginLeft:7}}/> 1. المنتج والخامات</h3>
-        {templates.map(t=><button type="button" key={t.id} className={"editor-template "+(templateId===t.id?"selected":"")} onClick={()=>setTemplateId(t.id)}><span className="template-icon"><Sparkles size={18}/></span><span style={{flex:1}}><b>{t.name}</b><small>{t.description}</small></span>{templateId===t.id&&<span style={{color:"#376b88"}}>✓</span>}</button>)}
+        {templates.map(t=><button type="button" key={t.id} className={"editor-template "+(templateId===t.id?"selected":"")} onClick={()=>{setTemplateId(t.id);setTemplateImage("");}}>{t.image?<img src={t.image} alt="" style={{width:48,height:48,objectFit:"contain",borderRadius:8,background:"#f4f6f8"}}/>:<span className="template-icon"><Sparkles size={18}/></span>}<span style={{flex:1}}><b>{t.name}</b><small>{t.description||t.category}</small></span>{templateId===t.id&&<span style={{color:"#376b88"}}>✓</span>}</button>)}
         <label className="field-label">صورة العرض الرئيسية</label><label className="btn secondary" style={{display:"flex",justifyContent:"center",gap:8}}><ImagePlus size={16}/> اختيار صورة العرض<input type="file" accept="image/*" hidden onChange={e=>readImage(e.target.files?.[0],setMainImage)}/></label>
         <label className="field-label">صورة القالب المستخدم</label><label className="btn secondary" style={{display:"flex",justifyContent:"center",gap:8}}><Upload size={16}/> اختيار صورة القالب<input type="file" accept="image/*" hidden onChange={e=>readImage(e.target.files?.[0],setTemplateImage)}/></label>
         {templateImage&&<button className="btn secondary" onClick={()=>setTemplateImage("")}>إزالة صورة القالب</button>}
@@ -110,7 +126,7 @@ export default function DesignPage() {
       <section className="editor-stage"><div className="stage-toolbar"><span>معاينة التصميم</span><span>اسحب النصوص والشعارات لتغيير مواقعها</span></div>
         {mainImage&&<div style={{margin:12}}><b style={{display:"block",marginBottom:6}}>صورة العرض الرئيسية</b><img src={mainImage} alt="صورة العرض الرئيسية" style={{width:"100%",maxHeight:180,objectFit:"contain",borderRadius:10,background:"#fff"}}/></div>}
         <div className="stage-canvas" onPointerMove={e=>{if(draggingElement===null)return;const rect=e.currentTarget.getBoundingClientRect();setElements(prev=>prev.map(item=>item.id===draggingElement?{...item,x:Math.max(3,Math.min(97,((e.clientX-rect.left)/rect.width)*100)),y:Math.max(3,Math.min(97,((e.clientY-rect.top)/rect.height)*100))}:item));}} onPointerUp={()=>setDraggingElement(null)} onPointerCancel={()=>setDraggingElement(null)}>
-          {templateImage?<img src={templateImage} alt="القالب المختار" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",pointerEvents:"none"}}/>:<div className={"stage-product "+current.shape} style={{background:"linear-gradient(145deg,"+color+",#102b43)"}}><div className="stage-inner" style={{borderColor:accent}}><span style={{color:accent,fontSize:10,letterSpacing:1}}>ROKN · CUSTOM MADE</span><strong style={{color:accent}}>{title||"عنوان التصميم"}</strong><i style={{background:accent}}/><span>{recipient||"اسم المكرّم"}</span><span style={{color:accent,fontSize:12}}>{subtitle}</span></div></div>}
+          {templateImage||current.image?<img src={templateImage||current.image||""} alt="القالب المختار" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",pointerEvents:"none"}}/>:<div className={"stage-product "+current.shape} style={{background:"linear-gradient(145deg,"+color+",#102b43)"}}><div className="stage-inner" style={{borderColor:accent}}><span style={{color:accent,fontSize:10,letterSpacing:1}}>ROKN · CUSTOM MADE</span><strong style={{color:accent}}>{title||"عنوان التصميم"}</strong><i style={{background:accent}}/><span>{recipient||"اسم المكرّم"}</span><span style={{color:accent,fontSize:12}}>{subtitle}</span></div></div>}
           {elements.map(item=><div key={item.id} onPointerDown={e=>{e.preventDefault();e.stopPropagation();setSelectedElement(item.id);setDraggingElement(item.id);(e.currentTarget.parentElement as HTMLElement|null)?.setPointerCapture?.(e.pointerId);}} onClick={()=>setSelectedElement(item.id)} style={{position:"absolute",left:item.x+"%",top:item.y+"%",transform:"translate(-50%,-50%)",cursor:draggingElement===item.id?"grabbing":"grab",zIndex:selectedElement===item.id?5:3,outline:selectedElement===item.id?"2px dashed #d7b56d":"none",padding:5,color:item.color,fontSize:item.size,textShadow:item.kind==="text"?"0 1px 3px #000":"none",maxWidth:"90%",textAlign:"center",touchAction:"none",userSelect:"none"}}>{item.kind==="text"?item.value:<img src={item.value} alt="شعار مضاف" style={{width:item.size,height:item.size,objectFit:"contain",display:"block"}}/>}</div>)}
         </div>
         <div className="stage-toolbar"><span>الخامة: {material}</span><span>{size}</span></div>
