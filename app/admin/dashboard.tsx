@@ -189,20 +189,33 @@ export default function AdminDashboard() {
     setQuotes(items=>items.map(item=>item.id===quote.id?{...item,status,estimatedPrice}:item));setNotice("تم تحديث عرض السعر.");
   }
   function notifyQuoteCustomer(quote: StoreQuote) {
-    const digits = quote.phone
+    const rawPhone = String(quote.phone || "")
       .replace(/[٠-٩]/g, d => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
       .replace(/[۰-۹]/g, d => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
-      .replace(/\D/g, "");
-    if (digits.length < 8 || digits.length > 15) {
-      setNotice("رقم هاتف العميل غير صالح لإعداد رابط واتساب. راجع الرقم قبل التواصل.");
+      .trim();
+    let digits = rawPhone.replace(/\\D/g, "");
+    if (digits.startsWith("00")) digits = digits.slice(2);
+    // Normalize common Libyan mobile formats to international country code 218.
+    if (digits.startsWith("2180")) digits = "218" + digits.slice(4);
+    else if (digits.startsWith("0") && digits.length >= 9 && digits.length <= 11) digits = "218" + digits.slice(1);
+    else if (digits.startsWith("9") && digits.length === 9) digits = "218" + digits;
+    if (digits.length < 10 || digits.length > 15 || !/^\\d+$/.test(digits)) {
+      setNotice("تعذر فتح واتساب لأن رقم العميل لا يبدو بصيغة دولية صحيحة. راجع الرقم وأدخله مع مفتاح الدولة، مثل 2189XXXXXXXX.");
       return;
     }
-    const priceLine = quote.estimatedPrice ? "\nتفاصيل العرض: " + quote.estimatedPrice : "";
+    const priceLine = quote.estimatedPrice ? "\\nتفاصيل العرض: " + quote.estimatedPrice : "";
     const message = "مرحبًا " + quote.customerName + "، بخصوص طلب عرض السعر لمنتج " + quote.productName +
       " (رقم المتابعة: " + quote.id + "). حالة الطلب: " + quote.status + "." + priceLine +
-      "\nيسعدنا الرد على أي استفسار. — ركن للأعمال الفنية";
-    window.open("https://wa.me/" + digits + "?text=" + encodeURIComponent(message), "_blank", "noopener,noreferrer");
-    setNotice("تم فتح واتساب برسالة جاهزة للعميل. راجع الرسالة واضغط إرسال داخل واتساب لإتمام الإشعار.");
+      "\\nيسعدنا الرد على أي استفسار. — ركن للأعمال الفنية";
+    const url = "https://api.whatsapp.com/send?phone=" + digits + "&text=" + encodeURIComponent(message);
+    const popup = window.open(url, "_blank");
+    if (popup) {
+      popup.opener = null;
+      setNotice("فتحنا صفحة واتساب للرقم " + digits + ". إذا لم تظهر المحادثة، تحقق من الرقم أو اسمح بالنوافذ المنبثقة.");
+    } else {
+      setNotice("المتصفح منع فتح واتساب. اسمح بالنوافذ المنبثقة لهذا الموقع ثم اضغط الزر مجددًا، أو افتح الرابط في تبويب جديد.");
+      window.location.assign(url);
+    }
   }
   async function logout() {
     await fetch("/api/admin/logout", {method:"POST"});
