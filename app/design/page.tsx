@@ -54,8 +54,8 @@ export default function DesignPage(){
  const current=templates.find(t=>t.id===templateId&&t.category===activeCategory)||categoryTemplates[0];
  const templateName=current?.title||current?.name||"قالب مخصص";
  const contentMode=current?.contentMode||"both";
- const textAllowed=contentMode!=="image";
- const imageAllowed=contentMode!=="text";
+ const textAllowed=true;
+ const imageAllowed=true;
 
  useEffect(()=>{let live=true;fetch("/api/design-templates").then(async response=>{const data=await response.json();if(live&&response.ok&&Array.isArray(data.templates)){if(data.templates.length){setTemplates(data.templates);const first=data.templates[0];setActiveCategory(first.category||"دروع");setTemplateId(first.id);setLayers([]);setSelectedId("");}else{setTemplates([]);setTemplateId("");}}}).catch(()=>{});return()=>{live=false;};},[]);
  useEffect(()=>{let live=true;setCustomBackground("");if(!templateId){setSavedBackgrounds([]);setLoadingBackgrounds(false);return()=>{live=false;};}setLoadingBackgrounds(true);fetch("/api/design-backgrounds?templateId="+encodeURIComponent(templateId)).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||"تعذر تحميل صور الخلفية.");if(live)setSavedBackgrounds(Array.isArray(data.backgrounds)?data.backgrounds:[]);}).catch(e=>{if(live){setSavedBackgrounds([]);setNotice(e instanceof Error?e.message:"تعذر تحميل صور الخلفية المحفوظة.");}}).finally(()=>{if(live)setLoadingBackgrounds(false);});return()=>{live=false;};},[templateId]);
@@ -74,7 +74,7 @@ export default function DesignPage(){
      :current?.category==="لوحات"||current?.id==="plaque"
      ?'<rect x="28" y="25" width="344" height="270" rx="12" fill="'+baseColor+'" stroke="'+accent+'" stroke-width="8"/>'
      :'<path d="M48 35 H352 V205 L200 285 L48 205 Z" fill="'+baseColor+'" stroke="'+accent+'" stroke-width="8"/>';
-   const backdrop=background?(selectedBackgroundAsset?'<image href="'+background+'" x="'+((selectedBackgroundAsset.placementX??0)*4)+'" y="'+((selectedBackgroundAsset.placementY??0)*3.2)+'" width="'+((selectedBackgroundAsset.placementWidth??100)*4)+'" height="'+((selectedBackgroundAsset.placementHeight??100)*3.2)+'" preserveAspectRatio="xMidYMid meet"/>':'<image href="'+background+'" x="0" y="0" width="400" height="320" preserveAspectRatio="xMidYMid meet"/>'):shape;
+   const backdrop=background?(selectedBackgroundAsset?'<image href="'+background+'" x="'+((selectedBackgroundAsset.placementX??0)*4)+'" y="'+((selectedBackgroundAsset.placementY??0)*3.2)+'" width="'+((selectedBackgroundAsset.placementWidth??100)*4)+'" height="'+((selectedBackgroundAsset.placementHeight??100)*3.2)+'" preserveAspectRatio="xMidYMid meet"/>':'<image href="'+background+'" x="0" y="0" width="400" height="320" preserveAspectRatio="xMidYMid meet"/>'):"";
    const content=layers.filter(l=>(l.kind==="text"&&textAllowed)||(l.kind==="image"&&imageAllowed)).map(l=>l.kind==="text"
      ?'<text x="'+(l.x*4)+'" y="'+(l.y*3.2)+'" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="'+l.size+'" font-weight="'+(l.bold?"700":"400")+'" fill="'+l.color+'">'+esc(l.value)+'</text>'
      :'<image href="'+l.value+'" x="'+(l.x*4-l.size/2)+'" y="'+(l.y*3.2-l.size/2)+'" width="'+l.size+'" height="'+l.size+'" preserveAspectRatio="xMidYMid meet"/>').join("");
