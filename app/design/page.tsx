@@ -1,167 +1,142 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, Layers3, Mail, RotateCcw, Ruler, Sparkles, ImagePlus, Plus, Trash2, ShoppingBag, Move, Type, Upload } from "lucide-react";
+import { ArrowRight, Download, ImagePlus, Layers3, Move, Plus, RotateCcw, ShoppingBag, Trash2, Type, Upload, X, Check } from "lucide-react";
 
-const fallbackTemplates = [
-  {id:"shield",name:"درع تكريمي",category:"دروع",shape:"shield",description:"مناسب للتكريم والإنجازات",image:""},
-  {id:"medal",name:"ميدالية تذكارية",category:"ميداليات",shape:"medal",description:"هدية رمزية بلمسة خاصة",image:""},
-  {id:"plaque",name:"لوحة تذكارية",category:"لوحات",shape:"plaque",description:"للمؤسسات والفعاليات",image:""},
+type Template = {id:string;title?:string;name?:string;category:string;description?:string;image?:string;published?:boolean};
+type Layer = {id:string;kind:"text"|"image";value:string;x:number;y:number;size:number;color:string;bold:boolean};
+const defaults:Template[]=[
+ {id:"shield",title:"درع تكريمي",name:"درع تكريمي",category:"دروع",description:"قالب كلاسيكي للتكريم"},
+ {id:"medal",title:"ميدالية تذكارية",name:"ميدالية تذكارية",category:"ميداليات",description:"تصميم دائري للمناسبات"},
+ {id:"plaque",title:"لوحة تذكارية",name:"لوحة تذكارية",category:"لوحات",description:"لوحة أنيقة للمؤسسات"}
 ];
-const materials = ["أكريليك","خشب","معدن","أكريليك وخشب","حسب توصية فريق ركن"];
-const sizes = ["صغير — 15 × 20 سم","متوسط — 20 × 30 سم","كبير — 30 × 40 سم","مقاس مخصص"];
-type TemplateItem = {id:string;name:string;category:string;shape:string;description:string;image?:string};
-type ElementItem = {id:number;kind:"text"|"image";value:string;x:number;y:number;size:number;color:string};
+const materials=["أكريليك","خشب","معدن","أكريليك وخشب","حسب توصية فريق ركن"];
+const sizes=["صغير — 15 × 20 سم","متوسط — 20 × 30 سم","كبير — 30 × 40 سم","مقاس مخصص"];
+const starter:Layer[]=[
+ {id:"heading",kind:"text",value:"شكر وتقدير",x:50,y:40,size:27,color:"#d7b56d",bold:true},
+ {id:"recipient",kind:"text",value:"يُكتب الاسم هنا",x:50,y:53,size:22,color:"#ffffff",bold:true},
+ {id:"subtitle",kind:"text",value:"تقديرًا لجهودكم وعطائكم",x:50,y:66,size:15,color:"#f6e7c4",bold:false}
+];
+const esc=(s:string)=>s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&apos;");
+function imageData(file:File):Promise<string>{return new Promise((resolve,reject)=>{if(!file.type.startsWith("image/")){reject(new Error("اختر ملف صورة صالحًا."));return;}if(file.size>5*1024*1024){reject(new Error("الحد الأقصى لحجم الصورة 5 ميغابايت."));return;}const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=()=>reject(new Error("تعذرت قراءة الصورة."));r.readAsDataURL(file);});}
 
-export default function DesignPage() {
-  const [templates,setTemplates] = useState<TemplateItem[]>(fallbackTemplates);
-  const [templateId,setTemplateId] = useState("shield");
-  const [title,setTitle] = useState("شكر وتقدير");
-  const [subtitle,setSubtitle] = useState("تقديرًا لجهودكم وعطائكم");
-  const [recipient,setRecipient] = useState("يُكتب الاسم هنا");
-  const [color,setColor] = useState("#173b53");
-  const [accent,setAccent] = useState("#d7b56d");
-  const [material,setMaterial] = useState("أكريليك وخشب");
-  const [size,setSize] = useState(sizes[1]);
-  const [quantity,setQuantity] = useState("1");
-  const [notes,setNotes] = useState("");
-  const [notice,setNotice] = useState("");
-  const [mainImage,setMainImage] = useState("");
-  const [templateImage,setTemplateImage] = useState("");
-  const [elements,setElements] = useState<ElementItem[]>([
-    {id:1,kind:"text",value:"شكر وتقدير",x:50,y:42,size:23,color:"#d7b56d"},
-    {id:2,kind:"text",value:"يُكتب الاسم هنا",x:50,y:55,size:17,color:"#ffffff"},
-    {id:3,kind:"text",value:"تقديرًا لجهودكم وعطائكم",x:50,y:67,size:13,color:"#d7b56d"}
-  ]);
-  const [selectedElement,setSelectedElement] = useState(1);
-  const [draggingElement,setDraggingElement] = useState<number|null>(null);
-  const [showBooking,setShowBooking] = useState(false);
-  const [customer,setCustomer] = useState({name:"",phone:"",deposit:""});
-  const current = templates.find(t=>t.id===templateId) || templates[0];
-  useEffect(() => {
-    let active = true;
-    fetch("/api/design-templates").then(async response => {
-      const data = await response.json();
-      if (!active || !response.ok || !Array.isArray(data.templates) || !data.templates.length) return;
-      const managed:TemplateItem[] = data.templates.map((item: {id:string;title:string;category:string;description:string;image:string}) => ({
-        id:item.id,name:item.title,category:item.category,description:item.description||"",
-        image:item.image||"",shape:item.category==="ميداليات"?"medal":item.category==="لوحات"?"plaque":"shield"
-      }));
-      setTemplates(managed);
-      setTemplateId(managed[0].id);
-    }).catch(()=>{});
-    return () => { active = false; };
-  }, []);
-  const safe = (value:string) => value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;").replaceAll("'","&apos;");
-  const svg = useMemo(() => {
-    const shape = templateId==="shield"
-      ? '<path d="M55 35 H345 V205 L200 285 L55 205 Z" fill="'+color+'" stroke="'+accent+'" stroke-width="8"/>'
-      : templateId==="medal"
-      ? '<circle cx="200" cy="155" r="105" fill="'+color+'" stroke="'+accent+'" stroke-width="9"/><path d="M145 38 L125 0 H175 L200 38 L225 0 H275 L255 38" fill="'+accent+'"/>'
-      : '<rect x="38" y="50" width="324" height="210" rx="8" fill="'+color+'" stroke="'+accent+'" stroke-width="9"/>';
-    const y1=templateId==="medal"?130:122, y2=templateId==="medal"?169:164, y3=templateId==="medal"?205:207;
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 400 320">'+shape+'<text x="200" y="'+y1+'" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="'+accent+'">'+safe(title)+'</text><text x="200" y="'+y2+'" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#ffffff">'+safe(recipient)+'</text><text x="200" y="'+y3+'" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="'+accent+'">'+safe(subtitle)+'</text></svg>';
-  },[templateId,color,accent,title,recipient,subtitle]);
-  function readImage(file:File|undefined, setter:(v:string)=>void) {
-    if(!file) return;
-    if(!file.type.startsWith("image/")) { setNotice("يرجى اختيار ملف صورة صالح."); return; }
-    if(file.size>5*1024*1024) { setNotice("حجم الصورة كبير؛ الحد الأقصى 5 ميغابايت."); return; }
-    const reader=new FileReader(); reader.onload=()=>{setter(String(reader.result||""));setNotice("تم تحميل الصورة للمعاينة.");}; reader.readAsDataURL(file);
-  }
-  function addText() {
-    const item={id:Date.now(),kind:"text" as const,value:"نص جديد",x:50,y:50,size:18,color:"#ffffff"};
-    setElements(prev=>[...prev,item]);setSelectedElement(item.id);setNotice("أُضيف نص جديد. اسحبه داخل المعاينة لتغيير مكانه.");
-  }
-  function addLogo(file:File|undefined) {
-    if(!file)return;
-    if(!file.type.startsWith("image/")){setNotice("يرجى اختيار ملف شعار بصيغة صورة.");return;}
-    if(file.size>5*1024*1024){setNotice("حجم الشعار أكبر من 5 ميغابايت.");return;}
-    const reader=new FileReader();reader.onload=()=>{const item={id:Date.now(),kind:"image" as const,value:String(reader.result||""),x:50,y:50,size:72,color:"#ffffff"};setElements(prev=>[...prev,item]);setSelectedElement(item.id);setNotice("تمت إضافة الشعار؛ اسحبه إلى المكان المطلوب.");};reader.readAsDataURL(file);
-  }
-  function updateSelected(patch:Partial<ElementItem>) {setElements(prev=>prev.map(e=>e.id===selectedElement?{...e,...patch}:e));}
-  function moveSelected(dx:number,dy:number) {setElements(prev=>prev.map(e=>e.id===selectedElement?{...e,x:Math.max(3,Math.min(97,e.x+dx)),y:Math.max(3,Math.min(97,e.y+dy))}:e));}
-  function exportSvg() {
-    const shape = current.shape==="medal"
-      ? '<circle cx="200" cy="160" r="112" fill="'+color+'" stroke="'+accent+'" stroke-width="8"/><path d="M170 48 L150 5 H185 L200 35 L215 5 H250 L230 48" fill="'+accent+'"/>'
-      : current.shape==="plaque"
-      ? '<rect x="28" y="25" width="344" height="270" rx="12" fill="'+color+'" stroke="'+accent+'" stroke-width="8"/>'
-      : '<path d="M48 35 H352 V205 L200 285 L48 205 Z" fill="'+color+'" stroke="'+accent+'" stroke-width="8"/>';
-    const background = mainImage || templateImage || current.image
-      ? '<image href="'+(mainImage||templateImage||current.image)+'" x="0" y="0" width="400" height="320" preserveAspectRatio="xMidYMid meet"/>'
-      : shape;
-    const layers = elements.map(item => item.kind==="text"
-      ? '<text x="'+(item.x*4)+'" y="'+(item.y*3.2)+'" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="'+item.size+'" font-weight="'+(item.id===1?"700":"500")+'" fill="'+item.color+'">'+safe(item.value)+'</text>'
-      : '<image href="'+item.value+'" x="'+(item.x*4-item.size/2)+'" y="'+(item.y*3.2-item.size/2)+'" width="'+item.size+'" height="'+item.size+'" preserveAspectRatio="xMidYMid meet"/>'
-    ).join("");
-    const output='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3000" height="2400" viewBox="0 0 400 320">'+background+layers+'</svg>';
-    const blob=new Blob([output],{type:"image/svg+xml;charset=utf-8"});
-    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="rokn-custom-design.svg";a.click();URL.revokeObjectURL(url);
-    setNotice("تم تنزيل التصميم بصيغة SVG مع تضمين النصوص والشعارات والصور المضافة.");
-  }
-  function reset() {setTemplateId("shield");setTitle("شكر وتقدير");setSubtitle("تقديرًا لجهودكم وعطائكم");setRecipient("يُكتب الاسم هنا");setColor("#173b53");setAccent("#d7b56d");setMaterial("أكريليك وخشب");setSize(sizes[1]);setQuantity("1");setNotes("");setElements([{id:1,kind:"text",value:"شكر وتقدير",x:50,y:42,size:23,color:"#d7b56d"},{id:2,kind:"text",value:"يُكتب الاسم هنا",x:50,y:55,size:17,color:"#ffffff"},{id:3,kind:"text",value:"تقديرًا لجهودكم وعطائكم",x:50,y:67,size:13,color:"#d7b56d"}]);setSelectedElement(1);setNotice("تمت إعادة الإعدادات إلى القيم الافتراضية.");}
-  function requestQuote() {
-    const subject=encodeURIComponent("طلب عرض سعر - ركن للأعمال الفنية");
-    const body=encodeURIComponent("طلب تصميم جديد\nالمنتج: "+current.name+"\nالعنوان: "+title+"\nالاسم: "+recipient+"\nالنص الإضافي: "+subtitle+"\nالخامة: "+material+"\nالمقاس: "+size+"\nالكمية: "+quantity+"\nملاحظات: "+(notes||"لا توجد")+"\nيرجى التواصل لتأكيد السعر والعربون.");
-    window.location.href="mailto:info@rokn-art-works.com?subject="+subject+"&body="+body;
-  }
-  function sendWhatsApp() {
-    const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
-    const phone=normalizeDigits(customer.phone).replace(/\D/g,"");
-    if(!customer.name.trim()||!phone){setNotice("أدخل اسمك ورقم هاتفك أولًا.");return;}
-    let target="";
-    target=process.env.NEXT_PUBLIC_WHATSAPP_NUMBER||"";
-    if(!target){try {target=localStorage.getItem("rokn-whatsapp-number")||"";}catch{}}
-    target=normalizeDigits(target).replace(/\D/g,"");
-    if(target.startsWith("00")) target=target.slice(2);
-    if(target.startsWith("0")) target="218"+target.slice(1);
-    if(target.length<10){setNotice("رقم واتساب الاستقبال غير محفوظ أو غير صحيح في هذا المتصفح. افتح لوحة الإدارة من نفس المتصفح، واحفظ الرقم بصيغة دولية مثل 2189XXXXXXXX، ثم أعد المحاولة.");return;}
-    const message="طلب حجز جديد - ركن للأعمال الفنية\nالعميل: "+customer.name+"\nهاتف العميل: "+phone+"\nالمنتج: "+current.name+"\nالخامة: "+material+"\nالمقاس: "+size+"\nالكمية: "+quantity+"\nالعربون المقترح: "+(customer.deposit||"يحدد بعد التسعير")+"\nملاحظات: "+(notes||"لا توجد")+"\nحالة الدفع: بانتظار تأكيد الإدارة";
-    const whatsappUrl="https://wa.me/"+target+"?text="+encodeURIComponent(message);
-    const opened=window.open(whatsappUrl,"_blank");
-    if(!opened){setNotice("منع المتصفح فتح واتساب. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.");return;}
-    setNotice("فتحنا واتساب برسالة الطلب. اضغط إرسال داخل واتساب لإتمام الإرسال؛ لا يُعد ذلك تأكيدًا لدفع العربون.");
-  }
+export default function DesignPage(){
+ const [templates,setTemplates]=useState<Template[]>(defaults);
+ const [templateId,setTemplateId]=useState("shield");
+ const [layers,setLayers]=useState<Layer[]>(starter);
+ const [selectedId,setSelectedId]=useState("heading");
+ const [dragging,setDragging]=useState(false);
+ const [customBackground,setCustomBackground]=useState("");
+ const [mainImage,setMainImage]=useState("");
+ const [baseColor,setBaseColor]=useState("#173b53");
+ const [accent,setAccent]=useState("#d7b56d");
+ const [material,setMaterial]=useState("أكريليك وخشب");
+ const [size,setSize]=useState(sizes[1]);
+ const [quantity,setQuantity]=useState("1");
+ const [notes,setNotes]=useState("");
+ const [notice,setNotice]=useState("");
+ const [showBooking,setShowBooking]=useState(false);
+ const [customer,setCustomer]=useState({name:"",phone:"",deposit:""});
+ const [saving,setSaving]=useState(false);
+ const stageRef=useRef<HTMLDivElement>(null);
+ const selected=layers.find(l=>l.id===selectedId);
+ const current=templates.find(t=>t.id===templateId)||templates[0];
+ const templateName=current?.title||current?.name||"قالب مخصص";
 
-  return <main className="editor-shell" dir="rtl">
-    <header className="editor-top"><div className="editor-title"><Link href="/" className="brand-mark">ر</Link><div><h1>استوديو تصميم ركن</h1><p>صمّم معاينتك، أضف الشعارات والنصوص، ثم جهّز طلبك</p></div></div><Link href="/" className="btn secondary"><ArrowRight size={16}/> العودة للمتجر</Link></header>
-    <div className="editor-layout">
-      <section className="editor-panel"><h3><Layers3 size={17} style={{display:"inline",verticalAlign:"middle",marginLeft:7}}/> 1. المنتج والخامات</h3>
-        {templates.map(t=><button type="button" key={t.id} className={"editor-template "+(templateId===t.id?"selected":"")} onClick={()=>{setTemplateId(t.id);setTemplateImage("");}}>{t.image?<img src={t.image} alt="" style={{width:48,height:48,objectFit:"contain",borderRadius:8,background:"#f4f6f8"}}/>:<span className="template-icon"><Sparkles size={18}/></span>}<span style={{flex:1}}><b>{t.name}</b><small>{t.description||t.category}</small></span>{templateId===t.id&&<span style={{color:"#376b88"}}>✓</span>}</button>)}
-        <label className="field-label">صورة العرض الرئيسية</label><label className="btn secondary" style={{display:"flex",justifyContent:"center",gap:8}}><ImagePlus size={16}/> اختيار صورة العرض<input type="file" accept="image/*" hidden onChange={e=>readImage(e.target.files?.[0],setMainImage)}/></label>
-        <label className="field-label">صورة القالب المستخدم</label><label className="btn secondary" style={{display:"flex",justifyContent:"center",gap:8}}><Upload size={16}/> اختيار صورة القالب<input type="file" accept="image/*" hidden onChange={e=>readImage(e.target.files?.[0],setTemplateImage)}/></label>
-        {templateImage&&<button className="btn secondary" onClick={()=>setTemplateImage("")}>إزالة صورة القالب</button>}
-        <label className="field-label" htmlFor="material">الخامة المقترحة</label><select id="material" value={material} onChange={e=>setMaterial(e.target.value)}>{materials.map(m=><option key={m}>{m}</option>)}</select>
-        <label className="field-label" htmlFor="size"><Ruler size={14} style={{display:"inline",verticalAlign:"middle",marginLeft:5}}/> المقاس</label><select id="size" value={size} onChange={e=>setSize(e.target.value)}>{sizes.map(s=><option key={s}>{s}</option>)}</select>
-        <label className="field-label" htmlFor="quantity">الكمية المطلوبة</label><input id="quantity" type="number" min="1" max="10000" value={quantity} onChange={e=>setQuantity(e.target.value)}/>
-        <p className="editor-help">صور التحميل تظهر في المعاينة الحالية فقط؛ حفظها الدائم وإدارتها من لوحة الإدارة يحتاجان تخزينًا على الخادم.</p>
-      </section>
-      <section className="editor-stage"><div className="stage-toolbar"><span>معاينة التصميم</span><span>اسحب النصوص والشعارات لتغيير مواقعها</span></div>
-        {mainImage&&<div style={{margin:12}}><b style={{display:"block",marginBottom:6}}>صورة العرض الرئيسية</b><img src={mainImage} alt="صورة العرض الرئيسية" style={{width:"100%",maxHeight:180,objectFit:"contain",borderRadius:10,background:"#fff"}}/></div>}
-        <div className="stage-canvas" onPointerMove={e=>{if(draggingElement===null)return;const rect=e.currentTarget.getBoundingClientRect();setElements(prev=>prev.map(item=>item.id===draggingElement?{...item,x:Math.max(3,Math.min(97,((e.clientX-rect.left)/rect.width)*100)),y:Math.max(3,Math.min(97,((e.clientY-rect.top)/rect.height)*100))}:item));}} onPointerUp={()=>setDraggingElement(null)} onPointerCancel={()=>setDraggingElement(null)}>
-          {templateImage||current.image?<img src={templateImage||current.image||""} alt="القالب المختار" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",pointerEvents:"none"}}/>:<div className={"stage-product "+current.shape} style={{background:"linear-gradient(145deg,"+color+",#102b43)"}}><div className="stage-inner" style={{borderColor:accent}}><span style={{color:accent,fontSize:10,letterSpacing:1}}>ROKN · CUSTOM MADE</span><strong style={{color:accent}}>{title||"عنوان التصميم"}</strong><i style={{background:accent}}/><span>{recipient||"اسم المكرّم"}</span><span style={{color:accent,fontSize:12}}>{subtitle}</span></div></div>}
-          {elements.map(item=><div key={item.id} onPointerDown={e=>{e.preventDefault();e.stopPropagation();setSelectedElement(item.id);setDraggingElement(item.id);(e.currentTarget.parentElement as HTMLElement|null)?.setPointerCapture?.(e.pointerId);}} onClick={()=>setSelectedElement(item.id)} style={{position:"absolute",left:item.x+"%",top:item.y+"%",transform:"translate(-50%,-50%)",cursor:draggingElement===item.id?"grabbing":"grab",zIndex:selectedElement===item.id?5:3,outline:selectedElement===item.id?"2px dashed #d7b56d":"none",padding:5,color:item.color,fontSize:item.size,textShadow:item.kind==="text"?"0 1px 3px #000":"none",maxWidth:"90%",textAlign:"center",touchAction:"none",userSelect:"none"}}>{item.kind==="text"?item.value:<img src={item.value} alt="شعار مضاف" style={{width:item.size,height:item.size,objectFit:"contain",display:"block"}}/>}</div>)}
-        </div>
-        <div className="stage-toolbar"><span>الخامة: {material}</span><span>{size}</span></div>
-      </section>
-      <section className="editor-panel"><h3>2. النصوص والشعارات</h3>
-        <button className="btn secondary" style={{width:"100%",justifyContent:"center"}} onClick={addText}><Plus size={16}/> إضافة نص</button>
-        <div style={{marginTop:12,marginBottom:12,padding:12,border:"1px dashed #8ca3b5",borderRadius:10}}><label className="field-label" htmlFor="logo-upload" style={{display:"block",marginBottom:8,fontWeight:700}}>إضافة شعار أو صورة إلى التصميم</label><input id="logo-upload" type="file" accept="image/*" onChange={e=>{addLogo(e.target.files?.[0]);e.currentTarget.value="";}} style={{display:"block",width:"100%",padding:8,background:"#fff",border:"1px solid #ccd6df",borderRadius:8}}/><p className="editor-help">اختر ملف صورة من جهازك. بعد تحميله، حدده وعدّل موضعه من أدوات التحكم أو اسحبه بالماوس.</p></div>
-        {elements.map(item=><div key={item.id} style={{border:"1px solid #e5eaf0",borderRadius:10,padding:10,marginTop:9,background:selectedElement===item.id?"#f5f8fb":"#fff"}}><div style={{display:"flex",alignItems:"center",gap:8}}><button className="btn secondary" onClick={()=>setSelectedElement(item.id)}>{item.kind==="text"?<Type size={14}/>:<ImagePlus size={14}/>} تحديد العنصر</button><span style={{flex:1,fontSize:12}}>{item.kind==="text"?"نص":"شعار / صورة"}</span><button className="btn secondary" aria-label="حذف العنصر" onClick={()=>{setElements(prev=>prev.filter(x=>x.id!==item.id));if(selectedElement===item.id)setSelectedElement(0);}}><Trash2 size={14}/></button></div>
-          {item.kind==="text"&&<input aria-label="محتوى النص" value={item.value} onChange={e=>setElements(prev=>prev.map(x=>x.id===item.id?{...x,value:e.target.value}:x))} style={{marginTop:8}}/>}
-          {selectedElement===item.id&&<><label className="field-label">حجم العنصر</label><input type="range" min="10" max="60" value={item.size} onChange={e=>updateSelected({size:Number(e.target.value)})}/>{item.kind==="text"&&<><label className="field-label">لون النص</label><input type="color" value={item.color} onChange={e=>updateSelected({color:e.target.value})}/></>}<p className="editor-help">الموضع الأفقي: {Math.round(item.x)}% · العمودي: {Math.round(item.y)}%</p><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,maxWidth:230,marginTop:8}}><span/><button type="button" className="btn secondary" onClick={()=>moveSelected(0,-2)} aria-label="تحريك لأعلى">↑ أعلى</button><span/><button type="button" className="btn secondary" onClick={()=>moveSelected(-2,0)} aria-label="تحريك لليسار">← يسار</button><button type="button" className="btn secondary" onClick={()=>moveSelected(0,2)} aria-label="تحريك لأسفل">↓ أسفل</button><button type="button" className="btn secondary" onClick={()=>moveSelected(2,0)} aria-label="تحريك لليمين">يمين →</button></div><label className="field-label">الموضع الأفقي</label><input type="range" min="3" max="97" value={item.x} onChange={e=>updateSelected({x:Number(e.target.value)})}/><label className="field-label">الموضع العمودي</label><input type="range" min="3" max="97" value={item.y} onChange={e=>updateSelected({y:Number(e.target.value)})}/></>}
-        </div>)}
-        <h3 style={{marginTop:22}}>3. تفاصيل المنتج</h3>
-        <label className="field-label" htmlFor="title">العنوان الرئيسي</label><input id="title" maxLength={80} value={title} onChange={e=>setTitle(e.target.value)} placeholder="شكر وتقدير"/>
-        <label className="field-label" htmlFor="recipient">اسم الشخص أو الجهة</label><input id="recipient" maxLength={100} value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="الاسم أو الجهة"/>
-        <label className="field-label" htmlFor="subtitle">النص الإضافي</label><textarea id="subtitle" maxLength={180} rows={3} value={subtitle} onChange={e=>setSubtitle(e.target.value)} placeholder="عبارة قصيرة أو تاريخ المناسبة"/>
-        <label className="field-label">الألوان</label><div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}><label style={{fontSize:11,color:"#6d7c8c"}}>لون القاعدة <input aria-label="لون القاعدة" type="color" value={color} onChange={e=>setColor(e.target.value)} style={{display:"block",width:44,height:36,border:0,background:"none"}}/></label><label style={{fontSize:11,color:"#6d7c8c"}}>لون الزخرفة <input aria-label="لون الزخرفة" type="color" value={accent} onChange={e=>setAccent(e.target.value)} style={{display:"block",width:44,height:36,border:0,background:"none"}}/></label></div>
-        <label className="field-label" htmlFor="notes">ملاحظات للتنفيذ</label><textarea id="notes" rows={3} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="طريقة التعليق، موعد المناسبة..."/>
-        <div className="editor-actions"><button className="btn primary" onClick={()=>setShowBooking(true)}><ShoppingBag size={16}/> متابعة للحجز</button><button className="btn secondary" onClick={requestQuote}><Mail size={16}/> طلب عرض سعر بالبريد</button><button className="btn secondary" onClick={exportSvg}><Download size={16}/> تنزيل SVG</button><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> إعادة الضبط</button></div>
-        {notice&&<p className="editor-help" role="status">{notice}</p>}
-      </section>
+ useEffect(()=>{let live=true;fetch("/api/design-templates").then(async response=>{const data=await response.json();if(live&&response.ok&&Array.isArray(data.templates)&&data.templates.length){setTemplates(data.templates);setTemplateId(data.templates[0].id);}}).catch(()=>{});return()=>{live=false;};},[]);
+ function updateSelected(patch:Partial<Layer>){setLayers(prev=>prev.map(l=>l.id===selectedId?{...l,...patch}:l));}
+ function addText(){const id=String(Date.now());setLayers(prev=>[...prev,{id,kind:"text",value:"نص جديد",x:50,y:50,size:20,color:"#ffffff",bold:false}]);setSelectedId(id);setNotice("أُضيف النص. اسحبه داخل لوحة التصميم أو اضبط موقعه من أدوات الموضع.");}
+ async function addImage(file?:File){if(!file)return;try{const value=await imageData(file);const id=String(Date.now())+"-"+Math.random().toString(36).slice(2,7);setLayers(prev=>[...prev,{id,kind:"image",value,x:50,y:50,size:90,color:"#ffffff",bold:false}]);setSelectedId(id);setNotice("تمت إضافة الصورة أو الشعار إلى التصميم.");}catch(e){setNotice(e instanceof Error?e.message:"تعذر إضافة الصورة.");}}
+ async function uploadBackground(file?:File){if(!file)return;try{setCustomBackground(await imageData(file));setNotice("تم تحميل الخلفية إلى المعاينة.");}catch(e){setNotice(e instanceof Error?e.message:"تعذر تحميل الخلفية.");}}
+ async function uploadMain(file?:File){if(!file)return;try{setMainImage(await imageData(file));setNotice("تم تحميل صورة العرض الإضافية.");}catch(e){setNotice(e instanceof Error?e.message:"تعذر تحميل الصورة.");}}
+ function pointerDown(e:React.PointerEvent<HTMLDivElement>,id:string){e.preventDefault();e.stopPropagation();setSelectedId(id);setDragging(true);stageRef.current?.setPointerCapture(e.pointerId);}
+ function pointerMove(e:React.PointerEvent<HTMLDivElement>){if(!dragging||!stageRef.current)return;const rect=stageRef.current.getBoundingClientRect();const x=Math.max(2,Math.min(98,(e.clientX-rect.left)/rect.width*100));const y=Math.max(2,Math.min(98,(e.clientY-rect.top)/rect.height*100));setLayers(prev=>prev.map(l=>l.id===selectedId?{...l,x,y}:l));}
+ function move(dx:number,dy:number){if(selected)updateSelected({x:Math.max(2,Math.min(98,selected.x+dx)),y:Math.max(2,Math.min(98,selected.y+dy))});}
+ function exportSvg(){
+   const background=customBackground||current?.image;
+   const shape=current?.category==="ميداليات"||current?.id==="medal"
+     ?'<circle cx="200" cy="160" r="112" fill="'+baseColor+'" stroke="'+accent+'" stroke-width="8"/><path d="M170 48 L150 5 H185 L200 35 L215 5 H250 L230 48" fill="'+accent+'"/>'
+     :current?.category==="لوحات"||current?.id==="plaque"
+     ?'<rect x="28" y="25" width="344" height="270" rx="12" fill="'+baseColor+'" stroke="'+accent+'" stroke-width="8"/>'
+     :'<path d="M48 35 H352 V205 L200 285 L48 205 Z" fill="'+baseColor+'" stroke="'+accent+'" stroke-width="8"/>';
+   const backdrop=background?'<image href="'+background+'" x="0" y="0" width="400" height="320" preserveAspectRatio="xMidYMid meet"/>':shape;
+   const content=layers.map(l=>l.kind==="text"
+     ?'<text x="'+(l.x*4)+'" y="'+(l.y*3.2)+'" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="'+l.size+'" font-weight="'+(l.bold?"700":"400")+'" fill="'+l.color+'">'+esc(l.value)+'</text>'
+     :'<image href="'+l.value+'" x="'+(l.x*4-l.size/2)+'" y="'+(l.y*3.2-l.size/2)+'" width="'+l.size+'" height="'+l.size+'" preserveAspectRatio="xMidYMid meet"/>').join("");
+   const svg='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3000" height="2400" viewBox="0 0 400 320">'+backdrop+content+'</svg>';
+   const url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="rokn-design.svg";a.click();URL.revokeObjectURL(url);setNotice("تم تنزيل ملف SVG ويشمل النصوص والصور المضافة.");
+ }
+ function reset(){setLayers(starter);setSelectedId("heading");setCustomBackground("");setMainImage("");setBaseColor("#173b53");setAccent("#d7b56d");setNotice("تمت إعادة التصميم إلى الإعدادات الأساسية.");}
+ function sendWhatsApp(){
+   const digits=(s:string)=>s.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+   const phone=digits(customer.phone).replace(/\D/g,"");if(!customer.name.trim()||!phone){setNotice("أدخل اسمك ورقم هاتفك أولًا.");return;}
+   let target=process.env.NEXT_PUBLIC_WHATSAPP_NUMBER||"";if(!target){try{target=localStorage.getItem("rokn-whatsapp-number")||"";}catch{}}
+   target=digits(target).replace(/\D/g,"");if(target.startsWith("00"))target=target.slice(2);if(target.startsWith("0"))target="218"+target.slice(1);
+   if(target.length<10){setNotice("رقم واتساب الاستقبال غير مضبوط في إعدادات الاستضافة.");return;}
+   const message="طلب تصميم وحجز - ركن للأعمال الفنية\nالعميل: "+customer.name+"\nهاتف العميل: "+phone+"\nالقالب: "+templateName+"\nالخامة: "+material+"\nالمقاس: "+size+"\nالكمية: "+quantity+"\nالعربون المقترح: "+(customer.deposit||"يحدد بعد التسعير")+"\nملاحظات: "+(notes||"لا توجد")+"\nيرجى تأكيد السعر والعربون.";
+   const url="https://wa.me/"+target+"?text="+encodeURIComponent(message);window.open(url,"_blank","noopener,noreferrer");setNotice("تم تجهيز رسالة الطلب. افتح واتساب واضغط إرسال لإتمام الإرسال.");
+ }
+ return <main dir="rtl" style={S.page}>
+  <header style={S.header}><div style={S.brand}><Link href="/" style={S.brandMark}>ر</Link><div><h1 style={S.title}>استوديو تصميم ركن</h1><p style={S.subTitle}>مساحة تصميم احترافية — حرّك، عدّل، أضف، وعاين</p></div></div><div style={S.headerActions}><button style={S.ghostButton} onClick={reset}><RotateCcw size={16}/> إعادة ضبط</button><button style={S.goldButton} onClick={exportSvg}><Download size={16}/> تنزيل التصميم</button><Link href="/" style={S.ghostLink}><ArrowRight size={16}/> المتجر</Link></div></header>
+  {notice&&<div role="status" style={S.notice}><span>{notice}</span><button onClick={()=>setNotice("")} style={S.closeNotice}><X size={16}/></button></div>}
+  <div style={S.workspace}>
+   <aside style={S.panel}><div style={S.panelHeading}><span style={S.step}>01</span><div><h2 style={S.panelTitle}>القوالب والخامات</h2><p style={S.panelHint}>اختر قالبًا من مكتبة الإدارة</p></div></div>
+    <div style={S.templateList}>{templates.map(t=><button key={t.id} onClick={()=>{setTemplateId(t.id);setCustomBackground("");}} style={{...S.templateButton,borderColor:templateId===t.id?"#c6a264":"#e1e7ed",background:templateId===t.id?"#fff9ed":"#fff"}}>{t.image?<img src={t.image} alt="" style={S.templateThumb}/>:<span style={S.templateThumbIcon}><Layers3 size={20}/></span>}<span style={{flex:1,textAlign:"right"}}><b>{t.title||t.name}</b><small style={S.templateCaption}>{t.description||t.category}</small></span>{templateId===t.id&&<Check size={17} color="#9a7538"/>}</button>)}</div>
+    <label style={S.fieldLabel}>صورة خلفية للتصميم</label><label style={S.uploadButton}><ImagePlus size={16}/> اختر صورة الخلفية<input type="file" accept="image/*" hidden onChange={e=>{uploadBackground(e.target.files?.[0]);e.currentTarget.value="";}}/></label>{customBackground&&<button onClick={()=>setCustomBackground("")} style={S.removeButton}>إزالة الخلفية</button>}
+    <label style={S.fieldLabel}>صورة عرض إضافية (اختياري)</label><label style={S.uploadButton}><Upload size={16}/> تحميل صورة العرض<input type="file" accept="image/*" hidden onChange={e=>{uploadMain(e.target.files?.[0]);e.currentTarget.value="";}}/></label>{mainImage&&<img src={mainImage} alt="صورة العرض الإضافية" style={{width:"100%",maxHeight:110,objectFit:"contain",marginTop:8,borderRadius:9,background:"#f5f7f9"}}/>}
+    <label style={S.fieldLabel}>الخامة</label><select style={S.input} value={material} onChange={e=>setMaterial(e.target.value)}>{materials.map(x=><option key={x}>{x}</option>)}</select>
+    <label style={S.fieldLabel}>المقاس</label><select style={S.input} value={size} onChange={e=>setSize(e.target.value)}>{sizes.map(x=><option key={x}>{x}</option>)}</select>
+    <label style={S.fieldLabel}>الكمية</label><input style={S.input} type="number" min="1" max="10000" value={quantity} onChange={e=>setQuantity(e.target.value)}/>
+    <div style={S.colorRow}><label style={S.fieldLabel}>لون القالب</label><input type="color" value={baseColor} onChange={e=>setBaseColor(e.target.value)} style={S.colorPicker}/></div><div style={S.colorRow}><label style={S.fieldLabel}>لون الإطار</label><input type="color" value={accent} onChange={e=>setAccent(e.target.value)} style={S.colorPicker}/></div>
+   </aside>
+   <section style={S.canvasPanel}><div style={S.canvasTop}><div><h2 style={S.panelTitle}>لوحة التصميم</h2><p style={S.panelHint}>اسحب العنصر لتغيير مكانه بدقة</p></div><span style={S.liveBadge}><span style={S.liveDot}/> معاينة مباشرة</span></div>
+    <div ref={stageRef} onPointerMove={pointerMove} onPointerUp={()=>setDragging(false)} onPointerCancel={()=>setDragging(false)} style={S.stage}>
+      {customBackground||current?.image?<img src={customBackground||current?.image||""} alt="خلفية القالب" draggable={false} style={S.stageBackground}/>:<div style={{...S.productShape,background:"linear-gradient(145deg,"+baseColor+",#102b43)",borderColor:accent,borderRadius:current?.category==="ميداليات"?"50%":current?.category==="لوحات"?10:0,clipPath:current?.category==="دروع"?"polygon(0 0,100% 0,100% 70%,50% 100%,0 70%)":"none"}}><div style={{...S.innerBorder,borderColor:accent}}><span style={{color:accent,fontSize:10,letterSpacing:1}}>ROKN · CUSTOM MADE</span><strong style={{color:accent,display:"block",margin:"16px 0"}}> </strong></div></div>}
+      {layers.map(l=><div key={l.id} onPointerDown={e=>pointerDown(e,l.id)} onClick={()=>setSelectedId(l.id)} style={{...S.layer,left:l.x+"%",top:l.y+"%",fontSize:l.kind==="text"?l.size:undefined,color:l.color,fontWeight:l.bold?800:500,outline:selectedId===l.id?"2px dashed #d7b56d":"2px solid transparent",cursor:dragging&&selectedId===l.id?"grabbing":"grab",textShadow:l.kind==="text"?"0 2px 5px #0008":"none"}}>{l.kind==="text"?l.value:<img src={l.value} alt="شعار مضاف" draggable={false} style={{width:l.size,height:l.size,objectFit:"contain",display:"block",pointerEvents:"none"}}/>}</div>)}
     </div>
-    {showBooking&&<div role="dialog" aria-modal="true" aria-label="تأكيد الحجز" style={{position:"fixed",inset:0,zIndex:1000,background:"#102b43b8",display:"grid",placeItems:"center",padding:16}}><section className="editor-panel" style={{width:"min(560px,100%)",maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 70px #0003"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><h2>تأكيد طلب الحجز</h2><button className="btn secondary" onClick={()=>setShowBooking(false)}>إغلاق</button></div><p>المنتج: {current.name} · الكمية: {quantity}</p><p>الخامة: {material} · المقاس: {size}</p><label className="field-label">الاسم الكامل</label><input required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="اسم صاحب الطلب"/><label className="field-label">رقم هاتفك للتواصل</label><input required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="رقم الهاتف مع مفتاح الدولة"/><label className="field-label">قيمة العربون المتفق عليه (إن وُجد)</label><input value={customer.deposit} onChange={e=>setCustomer({...customer,deposit:e.target.value})} placeholder="يحدد بعد تأكيد السعر"/><div style={{padding:12,background:"#f6f8fb",borderRadius:10,marginTop:12}}><b>طرق الدفع وحالة العربون</b><p style={{marginBottom:4}}>تُحدد طريقة الدفع وقيمة العربون مع الإدارة بعد مراجعة السعر. لا تُعتبر هذه الصفحة إثباتًا للدفع، ويجب التحقق من وصول العربون قبل تأكيده.</p></div><button className="btn primary" style={{width:"100%",justifyContent:"center",marginTop:14}} onClick={sendWhatsApp}>تجهيز الطلب وإرساله إلى واتساب</button><p className="editor-help">يلزم إعداد رقم واتساب الاستقبال في لوحة الإدارة. إذا لم يُضبط الرقم، لن يتم إرسال الطلب.</p></section></div>}
-    <p className="editor-help" style={{marginTop:18}}>تنبيه: هذا الإصدار يدعم معاينة الصور وإضافة عناصر متعددة وتحريكها بالسحب. الحفظ الدائم للصور والتصاميم، وربط الطلبات بقاعدة بيانات، ووسائل الدفع الإلكترونية، والإشعارات الفعلية ما زالت بحاجة إلى إعداد الخادم.</p>
-  </main>;
+    <div style={S.canvasMeta}><span>{templateName}</span><span>{material}</span><span>{size}</span></div>
+    <div style={S.primaryActions}><button onClick={exportSvg} style={S.darkButton}><Download size={17}/> تنزيل SVG عالي الدقة</button><button onClick={()=>setShowBooking(true)} style={S.goldButton}><ShoppingBag size={17}/> متابعة للحجز</button></div>
+    {mainImage&&<div style={S.mainImageNote}>صورة العرض الإضافية <button onClick={()=>setMainImage("")} style={S.removeButton}>إزالة</button></div>}
+   </section>
+   <aside style={S.panel}><div style={S.panelHeading}><span style={S.step}>02</span><div><h2 style={S.panelTitle}>النصوص والشعارات</h2><p style={S.panelHint}>أضف عناصر متعددة وتحكم بكل عنصر</p></div></div>
+    <div style={S.addRow}><button onClick={addText} style={S.darkButton}><Plus size={16}/> إضافة نص</button><label style={S.uploadButton}><ImagePlus size={16}/> إضافة شعار / صورة<input type="file" accept="image/*" hidden onChange={e=>{addImage(e.target.files?.[0]);e.currentTarget.value="";}}/></label></div>
+    <div style={S.layerList}>{layers.map((l,i)=><button key={l.id} onClick={()=>setSelectedId(l.id)} style={{...S.layerItem,background:selectedId===l.id?"#fff7e8":"#fff",borderColor:selectedId===l.id?"#c6a264":"#e3e8ee"}}><span style={S.layerNumber}>{i+1}</span><span style={{flex:1,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.kind==="text"?l.value:"شعار أو صورة"}</span><span style={S.layerKind}>{l.kind==="text"?"نص":"صورة"}</span></button>)}</div>
+    {selected&&<div style={S.selectedEditor}><div style={S.selectedTitle}><b>إعدادات العنصر المحدد</b><button aria-label="حذف العنصر" onClick={()=>{setLayers(prev=>prev.filter(l=>l.id!==selected.id));setSelectedId("");}} style={S.deleteButton}><Trash2 size={15}/> حذف</button></div>
+      {selected.kind==="text"&&<><label style={S.fieldLabel}>محتوى النص</label><textarea rows={3} style={{...S.input,resize:"vertical"}} value={selected.value} onChange={e=>updateSelected({value:e.target.value})}/><label style={S.fieldLabel}>لون النص</label><input type="color" value={selected.color} onChange={e=>updateSelected({color:e.target.value})} style={S.colorPicker}/><label style={S.fieldLabel}>نمط الخط</label><select style={S.input} value={selected.bold?"bold":"normal"} onChange={e=>updateSelected({bold:e.target.value==="bold"})}><option value="normal">عادي</option><option value="bold">عريض</option></select></>}
+      <label style={S.fieldLabel}>حجم العنصر <b>{selected.size}</b></label><input type="range" min={selected.kind==="text"?10:24} max={selected.kind==="text"?52:180} value={selected.size} onChange={e=>updateSelected({size:Number(e.target.value)})} style={S.range}/>
+      <label style={S.fieldLabel}>الموضع الأفقي <b>{Math.round(selected.x)}%</b></label><input type="range" min="2" max="98" value={selected.x} onChange={e=>updateSelected({x:Number(e.target.value)})} style={S.range}/>
+      <label style={S.fieldLabel}>الموضع العمودي <b>{Math.round(selected.y)}%</b></label><input type="range" min="2" max="98" value={selected.y} onChange={e=>updateSelected({y:Number(e.target.value)})} style={S.range}/>
+      <div style={S.movePad}><span/><button onClick={()=>move(0,-1)}>↑</button><span/><button onClick={()=>move(-1,0)}>←</button><button onClick={()=>move(0,1)}>↓</button><button onClick={()=>move(1,0)}>→</button></div>
+    </div>}
+    <div style={S.basicText}><h3 style={S.basicTitle}><Type size={16}/> النصوص الأساسية</h3><label style={S.fieldLabel}>العنوان الرئيسي</label><input style={S.input} value={layers.find(l=>l.id==="heading")?.value||""} onChange={e=>setLayers(prev=>prev.map(l=>l.id==="heading"?{...l,value:e.target.value}:l))}/><label style={S.fieldLabel}>الاسم / الجهة</label><input style={S.input} value={layers.find(l=>l.id==="recipient")?.value||""} onChange={e=>setLayers(prev=>prev.map(l=>l.id==="recipient"?{...l,value:e.target.value}:l))}/><label style={S.fieldLabel}>العبارة الإضافية</label><textarea rows={2} style={{...S.input,resize:"vertical"}} value={layers.find(l=>l.id==="subtitle")?.value||""} onChange={e=>setLayers(prev=>prev.map(l=>l.id==="subtitle"?{...l,value:e.target.value}:l))}/><label style={S.fieldLabel}>ملاحظات الطلب</label><textarea rows={2} style={{...S.input,resize:"vertical"}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="اكتب أي تفاصيل إضافية"/></div>
+   </aside>
+  </div>
+  {showBooking&&<div role="dialog" aria-modal="true" aria-label="تفاصيل الحجز" style={S.modalBackdrop}><form onSubmit={e=>{e.preventDefault();sendWhatsApp();}} style={S.modal}><div style={S.modalHeader}><div><h2 style={S.panelTitle}>متابعة طلب التصميم</h2><p style={S.panelHint}>راجع بياناتك قبل الانتقال إلى واتساب</p></div><button type="button" onClick={()=>setShowBooking(false)} style={S.closeNotice}><X size={18}/></button></div><label style={S.fieldLabel}>الاسم الكامل</label><input required style={S.input} value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/><label style={S.fieldLabel}>رقم هاتفك</label><input required inputMode="tel" style={S.input} value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="09xxxxxxxx"/><label style={S.fieldLabel}>العربون المقترح (اختياري)</label><input style={S.input} value={customer.deposit} onChange={e=>setCustomer({...customer,deposit:e.target.value})} placeholder="يحدد بعد التسعير"/><div style={S.modalActions}><button type="submit" style={S.whatsButton}>متابعة إلى واتساب</button><button type="button" onClick={()=>setShowBooking(false)} style={S.ghostButton}>إلغاء</button></div><p style={S.modalHint}>فتح واتساب لا يعني تأكيد الحجز أو دفع العربون. يجب إرسال الرسالة وموافقة الإدارة.</p></form></div>}
+  <footer style={S.footer}>ركن للأعمال الفنية · القوالب المنشورة من لوحة الإدارة تظهر في هذا الاستوديو</footer>
+ </main>;
 }
+
+const S:Record<string,React.CSSProperties>={
+ page:{minHeight:"100vh",background:"#f3f5f8",color:"#172a3b",fontFamily:"'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif"},
+ header:{background:"#102b43",color:"#fff",padding:"16px clamp(14px,3vw,36px)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"},
+ brand:{display:"flex",alignItems:"center",gap:12},brandMark:{width:44,height:44,borderRadius:13,background:"#d7b56d",color:"#102b43",display:"grid",placeItems:"center",fontSize:25,fontWeight:900,textDecoration:"none"},
+ title:{fontSize:21,margin:0},subTitle:{fontSize:12,color:"#d0dce7",margin:"3px 0 0"},headerActions:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"},
+ ghostButton:{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,padding:"10px 12px",border:"1px solid #71869a",borderRadius:10,background:"transparent",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"},
+ goldButton:{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,padding:"11px 14px",border:"1px solid #d7b56d",borderRadius:10,background:"#d7b56d",color:"#102b43",fontSize:13,fontWeight:800,cursor:"pointer",textDecoration:"none"},
+ ghostLink:{display:"inline-flex",alignItems:"center",gap:7,padding:"10px 12px",border:"1px solid #71869a",borderRadius:10,color:"#fff",fontSize:13,textDecoration:"none"},
+ notice:{width:"min(1600px,96%)",margin:"14px auto 0",padding:"11px 14px",borderRadius:11,background:"#fff8e9",border:"1px solid #ead8ad",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,fontSize:13},
+ closeNotice:{border:0,background:"transparent",color:"#5c6875",cursor:"pointer",display:"grid",placeItems:"center",padding:5},
+ workspace:{width:"min(1600px,97%)",margin:"18px auto 34px",display:"grid",gridTemplateColumns:"minmax(235px,285px) minmax(320px,1fr) minmax(260px,325px)",gap:14,alignItems:"start"},
+ panel:{background:"#fff",border:"1px solid #e0e6ed",borderRadius:15,padding:15,boxShadow:"0 5px 20px #102b4307",minWidth:0},
+ panelHeading:{display:"flex",alignItems:"center",gap:10,marginBottom:15},step:{width:35,height:35,borderRadius:11,display:"grid",placeItems:"center",background:"#f7edd9",color:"#87652c",fontSize:12,fontWeight:900},panelTitle:{fontSize:16,margin:0,fontWeight:800},panelHint:{fontSize:11,color:"#7a8795",margin:"4px 0 0",lineHeight:1.7},
+ templateList:{display:"grid",gap:8},templateButton:{width:"100%",display:"flex",alignItems:"center",gap:9,padding:9,border:"1px solid",borderRadius:11,color:"#172a3b",cursor:"pointer"},templateThumb:{width:49,height:49,objectFit:"contain",borderRadius:8,background:"#f2f4f7"},templateThumbIcon:{width:49,height:49,display:"grid",placeItems:"center",borderRadius:8,background:"#102b43",color:"#d7b56d"},templateCaption:{display:"block",fontSize:11,color:"#7a8795",marginTop:4},
+ fieldLabel:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,fontSize:12,fontWeight:700,margin:"13px 0 6px",color:"#394b5e"},input:{display:"block",width:"100%",minWidth:0,padding:"10px 11px",border:"1px solid #dce3ea",borderRadius:9,background:"#fff",color:"#172a3b",font:"inherit",fontSize:13,outlineColor:"#c5a265"},
+ uploadButton:{display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"10px 9px",border:"1px dashed #aebbc8",borderRadius:9,background:"#fafbfd",color:"#33485c",fontSize:12,fontWeight:700,cursor:"pointer"},
+ removeButton:{border:0,background:"transparent",color:"#a34b4b",fontSize:12,cursor:"pointer",marginTop:6},colorRow:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10},colorPicker:{width:50,height:32,border:0,background:"transparent",cursor:"pointer"},
+ canvasPanel:{background:"#fff",border:"1px solid #e0e6ed",borderRadius:15,padding:14,minWidth:0,boxShadow:"0 5px 20px #102b4307"},canvasTop:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"2px 3px 13px"},liveBadge:{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,color:"#367657",background:"#e9f6ee",borderRadius:20,padding:"6px 9px",whiteSpace:"nowrap"},liveDot:{width:6,height:6,borderRadius:"50%",background:"#37a366"},
+ stage:{position:"relative",width:"100%",aspectRatio:"5 / 4",overflow:"hidden",borderRadius:13,background:"linear-gradient(135deg,#e9edf2,#f8fafc)",boxShadow:"inset 0 0 0 1px #d8e0e8",touchAction:"none"},
+ stageBackground:{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",pointerEvents:"none",userSelect:"none"},productShape:{position:"absolute",inset:"8%",border:"7px solid",boxShadow:"0 16px 30px #102b4320",pointerEvents:"none"},innerBorder:{position:"absolute",inset:12,border:"1px solid",borderRadius:8,display:"grid",alignContent:"start",justifyItems:"center",paddingTop:30,opacity:.95},layer:{position:"absolute",transform:"translate(-50%,-50%)",zIndex:5,maxWidth:"90%",padding:5,borderRadius:4,outlineOffset:2,whiteSpace:"pre-wrap",overflowWrap:"anywhere",textAlign:"center",touchAction:"none",userSelect:"none",lineHeight:1.35},
+ canvasMeta:{display:"flex",justifyContent:"space-between",gap:7,flexWrap:"wrap",fontSize:11,color:"#7a8795",padding:"11px 3px"},primaryActions:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:6},darkButton:{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,padding:"11px 10px",border:"1px solid #102b43",borderRadius:10,background:"#102b43",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"},mainImageNote:{marginTop:10,fontSize:11,color:"#7a8795",display:"flex",justifyContent:"space-between",alignItems:"center"},
+ addRow:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7},layerList:{display:"grid",gap:6,marginTop:12},layerItem:{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"9px 8px",border:"1px solid",borderRadius:9,color:"#26394c",fontSize:12,cursor:"pointer"},layerNumber:{width:23,height:23,display:"grid",placeItems:"center",borderRadius:7,background:"#f0f3f6",fontSize:10,fontWeight:800},layerKind:{fontSize:10,color:"#8793a0"},selectedEditor:{borderTop:"1px solid #e5eaf0",marginTop:14,paddingTop:13},selectedTitle:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,fontSize:13},deleteButton:{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 8px",border:"1px solid #f0d6d6",borderRadius:8,background:"#fff5f5",color:"#a33",fontSize:11,cursor:"pointer"},range:{width:"100%",accentColor:"#c5a265",cursor:"pointer"},movePad:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,maxWidth:220,margin:"12px auto 0"},basicText:{borderTop:"1px solid #e5eaf0",marginTop:17,paddingTop:13},basicTitle:{display:"flex",alignItems:"center",gap:7,fontSize:14,margin:"0 0 7px"},modalBackdrop:{position:"fixed",inset:0,zIndex:40,background:"#102b4388",display:"grid",placeItems:"center",padding:16},modal:{width:"min(520px,100%)",maxHeight:"90vh",overflow:"auto",background:"#fff",borderRadius:17,padding:20,boxShadow:"0 24px 80px #0004"},modalHeader:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:8},modalActions:{display:"flex",gap:8,marginTop:16},whatsButton:{flex:1,padding:12,border:0,borderRadius:10,background:"#168b58",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"},modalHint:{fontSize:11,color:"#7a8795",lineHeight:1.8,marginBottom:0},footer:{textAlign:"center",fontSize:11,color:"#82909e",padding:"0 12px 24px"}
+};
