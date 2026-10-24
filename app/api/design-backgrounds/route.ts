@@ -27,7 +27,8 @@ async function ensureTable() {
     })().catch((error) => { schemaReady = null; throw error; });
   }
   await schemaReady;
-}export async function GET(request: Request) {
+}
+export async function GET(request: Request) {
   try {
     await ensureTable();
     const params = new URL(request.url).searchParams;
