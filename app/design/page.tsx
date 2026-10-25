@@ -14,12 +14,6 @@ const defaults:Template[]=[
 ];
 const materials=["أكريليك","خشب","معدن","أكريليك وخشب","حسب توصية فريق ركن"];
 const sizes=["صغير — 15 × 20 سم","متوسط — 20 × 30 سم","كبير — 30 × 40 سم","مقاس مخصص"];
-const starter:Layer[]=[
- {id:"heading",kind:"text",value:"شكر وتقدير",x:50,y:40,size:27,color:"#d7b56d",bold:true},
- {id:"recipient",kind:"text",value:"يُكتب الاسم هنا",x:50,y:53,size:22,color:"#ffffff",bold:true},
- {id:"subtitle",kind:"text",value:"تقديرًا لجهودكم وعطائكم",x:50,y:66,size:15,color:"#f6e7c4",bold:false}
-];
-function layersForTemplate(template?:Template):Layer[]{const mode=template?.contentMode||"both";const textX=template?.textX??50,textY=template?.textY??58;return mode==="image"?[]:starter.map((l,i)=>({...l,x:textX,y:Math.max(5,Math.min(95,textY+(i-1)*9))}));}
 const esc=(s:string)=>s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&apos;");
 function imageData(file:File):Promise<string>{return new Promise((resolve,reject)=>{if(!file.type.startsWith("image/")){reject(new Error("اختر ملف صورة صالحًا."));return;}if(file.size>5*1024*1024){reject(new Error("الحد الأقصى لحجم الصورة 5 ميغابايت."));return;}const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=()=>reject(new Error("تعذرت قراءة الصورة."));r.readAsDataURL(file);});}
 
@@ -53,7 +47,6 @@ export default function DesignPage(){
  const categoryTemplates=templates.filter(t=>(t.category||"أخرى")===activeCategory);
  const current=templates.find(t=>t.id===templateId&&t.category===activeCategory)||categoryTemplates[0];
  const templateName=current?.title||current?.name||"قالب مخصص";
- const contentMode=current?.contentMode||"both";
  const textAllowed=true;
  const imageAllowed=true;
 
