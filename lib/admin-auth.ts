@@ -45,7 +45,8 @@ function validToken(token?: string) {
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) return false;
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    return data.email === process.env.ADMIN_EMAIL && Number(data.exp) > Math.floor(Date.now() / 1000);
+    const configuredEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+    return typeof data.email === "string" && configuredEmail.length > 0 && data.email.trim().toLowerCase() === configuredEmail && Number(data.exp) > Math.floor(Date.now() / 1000);
   } catch {
     return false;
   }
