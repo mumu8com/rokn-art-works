@@ -37,10 +37,10 @@ export async function POST(request: Request) {
     const productId = Number(body.productId);
     const quantity = body.quantity === undefined ? 1 : Number(body.quantity);
     const details = typeof body.details === "string" ? body.details.trim().slice(0,4000) : "";
-    if (!customerName || !phone || phone.replace(/\\D/g, "").length < 7 || phone.replace(/\\D/g, "").length > 20 || !Number.isSafeInteger(productId) || productId <= 0) {
+    if (!customerName || !phone || phone.replace(/\D/g, "").length < 7 || phone.replace(/\D/g, "").length > 20 || !Number.isSafeInteger(productId) || productId <= 0) {
       return NextResponse.json({ error: "الاسم ورقم الهاتف الصحيح والمنتج مطلوبة." }, { status: 400 });
     }
-    if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "صيغة البريد الإلكتروني غير صحيحة." }, { status: 400 });
     }
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000) {
