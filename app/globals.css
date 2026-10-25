@@ -26,3 +26,16 @@
   .rokn-design-workspace > aside:last-child { grid-column: 1; grid-row: auto; }
   .rokn-design-stage { aspect-ratio: 4 / 3 !important; }
 }
+
+/* Accessibility and consistent responsive media */
+img, video, canvas, svg { max-width: 100%; }
+:focus-visible { outline: 3px solid var(--gold, #c5a265); outline-offset: 3px; }
+button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; opacity: .65; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
