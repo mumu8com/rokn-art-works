@@ -279,3 +279,72 @@ body{color:#101820;background:#fbfcf7}
 .cta-panel,.premium-cta{background:#101820}
 .cta-panel .btn{background:#DFFF00;color:#101820}
 @media(max-width:600px){.home-premium .premium-hero h1 span{color:#7f9100}}
+
+
+/* ROKN neon editorial refresh — inspired by the supplied Corner poster */
+:root{--ink:#f4f5f2;--muted:#b8c0c4;--line:#263640;--paper:#07131d;--navy:#07131d;--gold:#dfff00;--blue:#dfff00;--white:#f5f6f2;--radius:18px}
+html{background:#06111a;scroll-padding-top:24px}
+body{background:#06111a;color:#f5f6f2;font-family:'Alexandria','IBM Plex Sans Arabic',Tahoma,sans-serif}
+.wrap.home-premium{max-width:1440px;padding:22px clamp(18px,4vw,58px);overflow:hidden;position:relative}
+.home-premium:before{content:"";position:absolute;pointer-events:none;inset:0 auto auto 0;width:34%;height:540px;opacity:.18;background:repeating-linear-gradient(132deg,transparent 0 15px,#1e7182 16px 18px,transparent 19px 30px);mask-image:linear-gradient(#000,transparent)}
+.premium-nav{position:relative;z-index:2;border-bottom:1px solid #25333b;padding:12px 0 22px}
+.premium-nav .brand{color:#f8f8f4;font-size:26px;gap:12px}
+.premium-nav .brand small{display:block;font-size:11px;color:#c3cbd0;letter-spacing:.3px;margin-top:1px}
+.brand-mark{background:#dfff00;color:#07131d;border-radius:3px;font-size:25px;width:46px;height:46px}
+.premium-nav .links{color:#d1d7d9;gap:clamp(10px,2vw,24px)}
+.premium-nav .links a:hover,.card-link:hover{color:#dfff00}
+.premium-nav .nav-cta{background:#dfff00;color:#06111a;border-radius:5px;padding:11px 15px;font-weight:800}
+.premium-nav .nav-cta:hover{background:#efff66;color:#06111a}
+.premium-hero{position:relative;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:clamp(22px,4vw,62px);padding:64px 0 68px;min-height:550px}
+.hero-copy{position:relative;z-index:1}
+.home-premium .eyebrow{color:#dfff00;font-size:12px;letter-spacing:.5px}
+.home-premium .hero h1{color:#f8f8f4;font-size:clamp(36px,5.1vw,68px);line-height:1.28;letter-spacing:-1.6px;margin:18px 0}
+.home-premium .hero h1 span{color:#dfff00}
+.home-premium .hero p{color:#c4cdd1;line-height:2;font-size:16px;max-width:570px}
+.hero-actions{gap:12px;margin-top:27px}
+.home-premium .btn{border-radius:40px;padding:13px 20px;font-size:13px}
+.home-premium .btn.primary,.home-premium .btn:not(.secondary){background:#dfff00;color:#06111a}
+.home-premium .btn.primary:hover,.home-premium .btn:not(.secondary):hover{background:#f0ff69;color:#06111a}
+.home-premium .btn.secondary{background:transparent;border:1px solid #dfff00;color:#f8f8f4}
+.home-premium .btn.text-action{background:transparent;color:#dfff00;padding-inline:5px}
+.hero-proof{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:30px;color:#cbd2d4;font-size:11px}
+.hero-proof span{display:flex;align-items:center;gap:6px}
+.hero-proof svg{color:#dfff00}
+.hero-proof i{height:20px;width:1px;background:#526069}
+.hero-artwork{position:relative;min-height:450px;border-radius:3px;overflow:hidden;background:radial-gradient(ellipse at 60% 30%,#52636b 0,#1c2d36 37%,#07131d 76%);border:1px solid #34434a;box-shadow:0 24px 80px #0007}
+.hero-artwork:before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,#07131d 0%,transparent 58%),repeating-linear-gradient(0deg,transparent 0 70px,#dfff0011 71px 72px)}
+.hero-artwork:after{content:"ROKN  /  ART WORKS";position:absolute;bottom:22px;right:24px;color:#dfff00;font-size:11px;letter-spacing:3px;font-weight:800}
+.art-grid{position:absolute;inset:10% 8%;background:linear-gradient(135deg,transparent 0 38%,#dfff0020 39% 40%,transparent 41%),linear-gradient(35deg,transparent 0 55%,#e2cba344 56% 57%,transparent 58%);border:1px solid #b6c0c044;transform:perspective(700px) rotateY(-7deg)}
+.art-ring{position:absolute;border:1px solid #dfff00;transform:rotate(-22deg);border-radius:48% 52% 40% 60%;opacity:.75}
+.ring-one{width:60%;height:65%;top:13%;left:16%;box-shadow:0 0 45px #dfff0014}
+.ring-two{width:40%;height:48%;top:28%;left:29%;border-color:#d5b77b;transform:rotate(30deg)}
+.art-monogram{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#dfff00;font-size:clamp(100px,17vw,220px);font-weight:800;line-height:1;text-shadow:0 15px 55px #0009}
+.art-monogram span{font-size:13px;letter-spacing:8px;color:#f5f5ee;margin-top:14px}
+.art-label{position:absolute;color:#e7eceb;font-size:10px;letter-spacing:2px}
+.label-top{top:22px;left:24px}.label-bottom{bottom:24px;left:24px;letter-spacing:0;font-size:12px}
+.art-stamp{position:absolute;right:7%;top:8%;border:1px solid #dfff00;color:#dfff00;padding:12px 16px;transform:rotate(8deg);font-size:16px;font-weight:800}
+.home-premium .section{position:relative;padding:44px 0}
+.home-premium .section-heading h2,.home-premium .section h2{color:#f5f6f2;font-size:clamp(24px,3vw,34px)}
+.home-premium .section-heading p{color:#aebbc0;font-size:13px;line-height:1.9}
+.home-premium .card-link{color:#dfff00}
+.category-rail{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 22px}
+.category-pill{display:flex;gap:10px;align-items:center;border:1px solid #34444d;background:#0b1b26;color:#f4f5f2;border-radius:40px;padding:9px 14px;font-size:12px}
+.category-pill svg{color:#dfff00}
+.product-grid{gap:18px}
+.showcase-card,.service-card{background:#0b1a24;border:1px solid #263943;border-radius:14px;color:#f5f6f2}
+.showcase-card:hover{box-shadow:0 18px 45px #0005;border-color:#829000}
+.product-art{background:radial-gradient(circle at 50% 30%,#31434a,#0b1a24 76%)}
+.product-art.navy,.product-art.wood{background:radial-gradient(circle at 50% 30%,#31434a,#0b1a24 76%)}
+.product-art-image{background:#0b1a24}
+.card-meta{color:#aab6bb}.category-chip{background:#182a34;color:#dfff00}
+.card-body h3{color:#f5f6f2}.card-body p,.price-note{color:#aebbc0}
+.card-bottom{border-color:#293942}
+.services-grid{gap:14px}
+.service-icon{background:#dfff00;color:#07131d;border-radius:10px}
+.service-card h3{color:#f5f6f2}.service-card p{color:#b6c1c5}
+.premium-cta{background:linear-gradient(110deg,#0c1b25,#132a32);border:1px solid #304047;border-radius:16px;padding:clamp(25px,4vw,44px);margin:38px 0}
+.premium-cta h2{color:#fff}.premium-cta p{color:#b8c4c7}
+.premium-cta .btn{background:#dfff00;color:#07131d}
+.home-premium .footer{border-color:#263640;color:#9ba9af}
+@media(max-width:900px){.premium-hero{grid-template-columns:1fr;gap:28px;padding:42px 0}.hero-artwork{min-height:360px;order:-1}.premium-nav{align-items:flex-start}.premium-nav .links{justify-content:flex-end}.services-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.wrap.home-premium{padding:14px 16px}.premium-nav{display:block}.premium-nav .brand{margin-bottom:15px}.premium-nav .links{justify-content:flex-start;gap:9px 14px;font-size:12px}.premium-hero{padding:30px 0 38px}.hero-artwork{min-height:285px}.home-premium .hero h1{font-size:38px}.home-premium .hero p{font-size:14px}.hero-proof{gap:9px}.hero-proof i{display:none}.product-grid{grid-template-columns:1fr}.product-art{height:245px}.section-heading{align-items:flex-start;flex-direction:column}.services-grid{grid-template-columns:1fr 1fr}.premium-cta{align-items:flex-start;flex-direction:column}.home-premium .footer{flex-direction:column}}
