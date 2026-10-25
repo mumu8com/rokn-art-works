@@ -19,16 +19,33 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  let parsed: unknown;
+  try {
+    parsed = await request.json();
+  } catch {
+    return NextResponse.json({ error: "بيانات الطلب غير صالحة." }, { status: 400 });
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return NextResponse.json({ error: "بيانات الطلب غير صالحة." }, { status: 400 });
+  }
+  const body = parsed as Record<string, unknown>;
   try {
     await ensureStoreSchema();
-    const body = await request.json() as Record<string, unknown>;
     const customerName = typeof body.customerName === "string" ? body.customerName.trim().slice(0,120) : "";
     const phone = typeof body.phone === "string" ? body.phone.trim().slice(0,40) : "";
     const email = typeof body.email === "string" ? body.email.trim().slice(0,160) : "";
     const productId = Number(body.productId);
-    const quantity = Number.isSafeInteger(Number(body.quantity)) ? Math.max(1, Math.min(1000, Number(body.quantity))) : 1;
+    const quantity = body.quantity === undefined ? 1 : Number(body.quantity);
     const details = typeof body.details === "string" ? body.details.trim().slice(0,4000) : "";
-    if (!customerName || !phone || !Number.isSafeInteger(productId) || productId <= 0) return NextResponse.json({ error: "الاسم ورقم الهاتف والمنتج مطلوبة." }, { status: 400 });
+    if (!customerName || !phone || phone.replace(/\\D/g, "").length < 7 || phone.replace(/\\D/g, "").length > 20 || !Number.isSafeInteger(productId) || productId <= 0) {
+      return NextResponse.json({ error: "الاسم ورقم الهاتف الصحيح والمنتج مطلوبة." }, { status: 400 });
+    }
+    if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "صيغة البريد الإلكتروني غير صحيحة." }, { status: 400 });
+    }
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000) {
+      return NextResponse.json({ error: "يجب أن تكون الكمية عددًا صحيحًا بين 1 و1000." }, { status: 400 });
+    }
     const db = storePool();
     const product = await db.query("SELECT id,name FROM store_products WHERE id=$1 AND status='منشور'", [productId]);
     if (!product.rowCount) return NextResponse.json({ error: "المنتج غير متاح حاليًا." }, { status: 404 });
