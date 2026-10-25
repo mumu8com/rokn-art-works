@@ -224,3 +224,58 @@ a:hover{color:#00bfff}
 .cta-panel,.premium-cta{background:#071b2b}
 .cta-panel .btn{background:#00bfff;color:#071b2b}
 @media(max-width:600px){.home-premium .premium-hero h1 span{color:#00aee8}}
+
+
+/* ROKN brand palette refinement: charcoal and lemon */
+:root{--ink:#101820;--navy:#101820;--gold:#DFFF00;--blue:#DFFF00;--paper:#F8FAF0}
+body{color:#101820;background:#fbfcf7}
+.brand,.catalog-brand{color:#101820}
+.brand-mark,.catalog-brand>span{background:#101820;color:#DFFF00;box-shadow:0 0 0 1px #DFFF0033}
+.links a:hover{color:#8fa000}
+.home-premium .premium-hero:before{border-color:#DFFF0035}
+.home-premium .eyebrow,.eyebrow{color:#718000}
+.home-premium .premium-hero h1 span{color:#7f9100}
+.home-premium .hero-artwork{background:radial-gradient(ellipse at 50% 45%,#26343c 0,#101820 62%,#090f14 100%);border-color:#DFFF0045}
+.home-premium .art-grid{background-image:linear-gradient(#DFFF0012 1px,transparent 1px),linear-gradient(90deg,#DFFF0012 1px,transparent 1px)}
+.home-premium .art-ring{border-color:#DFFF0055}
+.home-premium .ring-two{border-color:#DFFF0035}
+.home-premium .art-monogram{color:#DFFF00;text-shadow:0 0 34px #DFFF0035}
+.home-premium .art-monogram span{color:#efffa0}
+.home-premium .art-label{color:#efffa0}
+.home-premium .art-stamp{border-color:#DFFF00;color:#efffa0;background:#101820e8}
+.home-premium .hero-proof svg{color:#8fa000}
+.home-premium .btn.primary,.home-premium .btn:not(.secondary){background:#DFFF00;color:#101820}
+.home-premium .btn.primary:hover,.home-premium .btn:not(.secondary):hover{background:#edff70}
+.home-premium .btn.secondary{border-color:#d9e59a;color:#101820;background:#fff}
+.home-premium .category-pill:hover{border-color:#c5d900;background:#f8fce5}
+.home-premium .category-pill svg{color:#718000}
+.home-premium .category-pill:hover{color:#718000}
+.home-premium .showcase-card:hover{border-color:#d4e56b;box-shadow:0 20px 45px #10182012}
+.home-premium .service-icon{background:#f3f9d7;color:#687700}
+.home-premium .premium-process .service-card{border-top-color:#DFFF00}
+.home-premium .premium-cta{background:radial-gradient(ellipse at 85% 20%,#344047,#101820 65%)}
+.home-premium .premium-cta .eyebrow{color:#DFFF00!important}
+.home-premium .premium-cta .btn{background:#DFFF00;color:#101820}
+.home-premium .premium-cta .btn:hover{background:#edff70}
+.catalog-nav nav a:hover,.catalog-back:hover,.product-detail-breadcrumb a:hover{color:#718000}
+.catalog-hero .eyebrow,.product-detail-copy .eyebrow{color:#718000}
+.catalog-hero h1 span{color:#7f9100}
+.catalog-search{border-color:#e4e9b8;color:#718000}
+.catalog-chip:hover,.catalog-chip.active{background:#f8fce5;border-color:#d4e56b;color:#5d6900}
+.catalog-card:hover{border-color:#d4e56b;box-shadow:0 17px 40px #10182012}
+.catalog-tag{background:#f4f8dc;color:#657300}
+.catalog-detail,.catalog-detail:hover{color:#5e6b00}
+.catalog-button{background:#DFFF00;color:#101820}
+.catalog-button:hover{background:#edff70}
+.catalog-secondary{border-color:#e4e9b8;color:#101820}
+.product-detail-media{background:radial-gradient(ellipse at 50% 30%,#fff 0,#f7f9e9 58%,#e9edda 100%);border-color:#e4e9b8}
+.product-detail-copy li svg{color:#718000}
+.btn.primary,.btn:not(.secondary){background:#DFFF00;color:#101820}
+.btn.primary:hover,.btn:not(.secondary):hover{background:#edff70}
+.btn.secondary{border-color:#e4e9b8;color:#101820}
+.category-chip{background:#f4f8dc;color:#657300}
+.card-link{color:#5e6b00}
+.service-icon{background:#f3f9d7;color:#687700}
+.cta-panel,.premium-cta{background:#101820}
+.cta-panel .btn{background:#DFFF00;color:#101820}
+@media(max-width:600px){.home-premium .premium-hero h1 span{color:#7f9100}}
